@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>UI selftest</title>
+    <!-- 本番と同じ見た目で走らせる（このページを開けば目でも確かめられる） -->
+    <link rel="stylesheet" href="../src/style.css" />
+  </head>
+  <body>
+    <!--
+      本物の index.html の中身をそのまま取り込んで UI を動かし、実際の click /
+      contextmenu を投げて結果を #result に書く。tools/uitest.mjs が
+      ヘッドレス Chrome でこのページを開いて JSON を読む。
+    -->
+    <pre id="result">{"ok":false,"note":"まだ走っていません"}</pre>
+    <div id="app"></div>
+
+    <script type="module">
+      const results = [];
+      const check = (name, cond, detail = '') => results.push({ name, ok: !!cond, detail: String(detail) });
+      // ヘッドレスでは requestAnimationFrame が一度も来ないので、
+      // 待ちはタイマーだけで作る（UI 側も rAF に頼り切らない作りにしてある）。
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const settle = (n = 4) => sleep(80 * n);
+      const $ = (id) => document.getElementById(id);
+      const click = (node, type = 'click') =>
+        node.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
+
+      const DATE = '2026-09-01';
+      const LEVEL = 'easy';
+
+      function finish(fatal) {
+        const ok = !fatal && results.every((r) => r.ok);
+        $('result').textContent = JSON.stringify({ ok, fatal: fatal || null, results });
+        document.title = ok ? 'SELFTEST-OK' : 'SELFTEST-NG';
+      }
+
+      window.addEventListener('error', (e) => finish(`未捕捉のエラー: ${e.message}`));
+
+      try {
+        // 1. 本物の index.html の body を取り込む（script は import で自分で読む）
+        const html = await fetch('../index.html').then((r) => r.text());
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        for (const s of doc.querySelectorAll('script')) s.remove();
+        $('app').replaceChildren(...doc.body.children);
+
+        location.hash = `#${DATE}/${LEVEL}`;
+        localStorage.clear();
+
+        const akari = await import('../src/akari.js');
+        await import('../src/ui.js');
+        await settle();
+
+        // 2. 盤面が描けているか
+        const made = akari.dailyPuzzle(DATE, LEVEL);
+        const n = made.puzzle.w * made.puzzle.h;
+        const cells = $('board').querySelectorAll('.cell');
+        check('盤面のマス数が問題と一致', cells.length === n, `${cells.length} / ${n}`);
+        const whites = made.puzzle.cells.reduce((a, c) => a + (c === akari.WHITE ? 1 : 0), 0);
+        check(
+          '白マスの数が一致',
+          $('board').querySelectorAll('.cell.white').length === whites,
+          `${$('board').querySelectorAll('.cell.white').length} / ${whites}`,
+        );
+        check('「作っています」が消えている', $('busy').classList.contains('hidden'));
+        check(
+          '手つかずの盤面を間違い扱いしない',
+          $('state').textContent.startsWith('未点灯') && !$('state').classList.contains('ng'),
+          $('state').textContent,
+        );
+
+        const cellAt = (i) => $('board').querySelector(`.cell.white[data-i="${i}"]`);
+        const lampCells = [];
+        for (let i = 0; i < n; i++) if (made.solution[i] === akari.LAMP) lampCells.push(i);
+
+        // 3. 右クリックで×印
+        const someWhite = made.puzzle.cells.findIndex((c) => c === akari.WHITE);
+        click(cellAt(someWhite), 'contextmenu');
+        await settle(1);
+        check('右クリックで×印が付く', cellAt(someWhite).classList.contains('mark'));
+        click(cellAt(someWhite), 'contextmenu');
+        await settle(1);
+        check('もう一度で×印が消える', !cellAt(someWhite).classList.contains('mark'));
+
+        // 4. 照らし合いが赤くなる（同じ行の白マス2つに置く）
+        let pairA = -1;
+        let pairB = -1;
+        const ix = akari.buildIndex(made.puzzle);
+        for (const i of ix.whites) {
+          const beam = ix.beams[i];
+          if (beam.length > 1) {
+            pairA = i;
+            pairB = beam[1];
+            break;
+          }
+        }
+        click(cellAt(pairA));
+        click(cellAt(pairB));
+        await settle(1);
+        check('照らし合う2つが赤くなる', cellAt(pairA).classList.contains('clash') && cellAt(pairB).classList.contains('clash'));
+        check('照明の数が出る', $('lamps').textContent.includes('2'), $('lamps').textContent);
+
+        // 5. 保存されている
+        const saved = localStorage.getItem(`akari:v1:${DATE}:${LEVEL}`);
+        check('途中経過が保存される', saved && JSON.parse(saved).s.includes('1'));
+
+        // 6. やり直すで全部消える
+        click($('reset'));
+        await settle(1);
+        check('やり直すで照明が消える', $('board').querySelectorAll('.cell.white.lamp').length === 0);
+
+        // 7. まちがい探し（答えに無い照明を赤枠にする）
+        const notLamp = ix.whites.find((i) => made.solution[i] !== akari.LAMP);
+        click(cellAt(notLamp));
+        click($('check'));
+        await settle(1);
+        check('まちがい探しが間違いを指す', cellAt(notLamp).classList.contains('wrong'));
+
+        // 8. ヒント（間違いを1つ外す → 正しい照明を1つ置く）
+        click($('hint'));
+        await settle(1);
+        check('ヒントが間違った照明を外す', !cellAt(notLamp).classList.contains('lamp'));
+        click($('hint'));
+        await settle(1);
+        const given = $('board').querySelectorAll('.cell.white.given');
+        check('ヒントが正解を1つ置く', given.length === 1 && given[0].classList.contains('lamp'));
+
+        // 9. 答えどおりに置くとクリアになる
+        click($('reset'));
+        await settle(1);
+        for (const i of lampCells) click(cellAt(i));
+        await settle(1);
+        check('全部置くとクリア判定が出る', !$('overlay').classList.contains('hidden'));
+        check('クリアの見出し', $('overlay-title').textContent === 'クリア！', $('overlay-title').textContent);
+        check('状態表示がクリア済み', $('state').textContent === 'クリア済み', $('state').textContent);
+        check(
+          '全部の白マスが点灯している',
+          $('board').querySelectorAll('.cell.white.lit').length === whites,
+        );
+        check('クリア後は照らし合いが無い', $('board').querySelectorAll('.cell.white.clash').length === 0);
+
+        // 10. 日付を戻すと別の問題になり、クリア状態は持ち越さない
+        const before = $('board').innerHTML;
+        click($('prev-day'));
+        await settle();
+        check('前日で問題が変わる', $('board').innerHTML !== before);
+        check('前日は未クリア', $('overlay').classList.contains('hidden'));
+        check('URL に日付と難易度が乗る', location.hash === `#${akari.todayString(new Date(2026, 7, 31))}/${LEVEL}`, location.hash);
+
+        // 11. 戻ってくるとクリア済みが復元される
+        location.hash = `#${DATE}/${LEVEL}`;
+        await settle(8);
+        check('クリア済みが保存から戻る', $('state').textContent === 'クリア済み', $('state').textContent);
+
+        finish(null);
+      } catch (err) {
+        finish(`${err && err.message}\n${err && err.stack}`);
+      }
+    </script>
+  </body>
+</html>

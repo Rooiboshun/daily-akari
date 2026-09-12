@@ -6,6 +6,8 @@
   "private": true,
   "scripts": {
     "verify": "node tools/verify.mjs",
+    "uitest": "node tools/uitest.mjs",
+    "serve": "node tools/serve.mjs",
     "peek": "node tools/peek.mjs"
   }
 }

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Daily Akari — 日替わり美術館</title>
+    <meta name="description" content="毎日おなじ問題が出る美術館(Akari)パズル。問題はブラウザの中で作られます。" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="stylesheet" href="src/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>日替わり美術館</h1>
+      <nav class="dates">
+        <button id="prev-day" class="chip" title="前の日">◀</button>
+        <input id="date" type="date" class="chip date" />
+        <button id="next-day" class="chip" title="次の日">▶</button>
+        <button id="today" class="chip">今日</button>
+      </nav>
+      <nav class="levels" id="levels"></nav>
+    </header>
+
+    <main>
+      <div class="board-wrap">
+        <div id="board" class="board" role="grid" aria-label="盤面"></div>
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card">
+            <div id="overlay-title" class="overlay-title">クリア！</div>
+            <div id="overlay-body" class="overlay-body"></div>
+            <button id="overlay-close" class="btn">盤面を見る</button>
+          </div>
+        </div>
+        <div id="busy" class="busy hidden">問題を作っています…</div>
+      </div>
+
+      <div class="status">
+        <span id="lamps" class="stat">照明 0</span>
+        <span id="timer" class="stat">0:00</span>
+        <span id="state" class="stat state"></span>
+      </div>
+
+      <div class="tools">
+        <button id="mode" class="btn" aria-pressed="false">タップ: 照明</button>
+        <button id="hint" class="btn">ヒント</button>
+        <button id="check" class="btn">まちがい探し</button>
+        <button id="reset" class="btn">やり直す</button>
+        <button id="reveal" class="btn danger">答えを見る</button>
+      </div>
+
+      <p class="howto">
+        白マスをクリックで照明。右クリック（スマホは長押し、または「タップ:」ボタンの切り替え）で「置かない」印。
+        照明はぶつかり合ってはいけません。数字は接する照明の本数です。
+      </p>
+    </main>
+
+    <footer class="foot">
+      <span id="seedline"></span>
+      <a href="https://dailyakari.com/" target="_blank" rel="noreferrer noopener">元ネタ: Daily Akari</a>
+    </footer>
+
+    <script type="module" src="src/ui.js"></script>
+  </body>
+</html>
