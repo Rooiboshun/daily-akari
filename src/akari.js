@@ -441,7 +441,15 @@ function fillAllHints(puzzle, st) {
  * @param {number} opt.blackRatio 黒マスの割合（既定 0.2）
  * @param {Function} opt.rng 0..1 の乱数。省略時は Math.random
  * @param {boolean} opt.logicOnly true なら「分岐なしで解ける」問題だけ作る
- * @param {number} opt.attempts 諦めるまでの試行回数（既定 200）
+ * @param {number} opt.attempts 諦めるまでの試行回数（既定 2000）
+ *
+ * 試行回数について: 盤面の採用率は実測で easy 10.3% / normal 3.8% / hard 1.9%
+ * （難易度ごとに 60 回生成して計測）。捨てられる理由はほぼ全部
+ * 「全黒マスに数字を入れてもなお解が一意にならない」で、1回の試行は 0.3ms 程度。
+ * 既定が 200 回だった頃は hard が 2% ほどの確率で丸ごと失敗し、種が日付で
+ * 決まる dailyPuzzle では特定の日（2027-01-01 と 2027-06-21）が必ず
+ * 「作れませんでした」になっていた。2000 回なら hard でも失敗する見込みは
+ * 1e-17 程度。成功する種では打ち切り回数を増やしても出来上がる問題は変わらない。
  */
 export function generate(opt = {}) {
   const {
@@ -450,7 +458,7 @@ export function generate(opt = {}) {
     blackRatio = 0.2,
     rng = Math.random,
     logicOnly = true,
-    attempts = 200,
+    attempts = 2000,
   } = opt;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
