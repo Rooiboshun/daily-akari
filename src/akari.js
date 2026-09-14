@@ -227,24 +227,44 @@ export function isValidSolution(ix, st) {
 
 /**
  * 解を limit 個まで数える。一意性の検査は limit=2 で呼んで count===1 を見る。
- * @returns {{count:number, solutions:Int8Array[], guesses:number, logicOnly:boolean}}
+ *
+ * opt.nodeLimit を渡すと、探索の節をその数だけ見たところで打ち切って
+ * aborted: true を返す。自分で作った問題は数ミリ秒で解けるので既定は無制限だが、
+ * 外から読み込んだ問題（puzz.link の URL など）は解が無いまま探索が
+ * 膨らむことがあるので、画面が固まらないように上限を付けて呼ぶ。
+ *
+ * @returns {{count:number, solutions:Int8Array[], guesses:number,
+ *            logicOnly:boolean, nodes:number, aborted:boolean}}
  */
-export function solve(ix, limit = 2) {
+export function solve(ix, limit = 2, opt = {}) {
   const st = new Int8Array(ix.w * ix.h); // 全部 UNKNOWN(0)
   const solutions = [];
-  const stats = { guesses: 0, branched: false };
+  const stats = {
+    guesses: 0,
+    branched: false,
+    nodes: 0,
+    nodeLimit: opt.nodeLimit === undefined ? Infinity : opt.nodeLimit,
+    aborted: false,
+  };
   search(ix, st, solutions, limit, stats);
   return {
     count: solutions.length,
     solutions,
     guesses: stats.guesses,
     // 一度も分岐せずに解けたか（＝素直な論理だけで解ける易しい問題か）
-    logicOnly: !stats.branched && solutions.length === 1,
+    logicOnly: !stats.branched && solutions.length === 1 && !stats.aborted,
+    nodes: stats.nodes,
+    aborted: stats.aborted,
   };
 }
 
 function search(ix, st, solutions, limit, stats) {
   if (solutions.length >= limit) return;
+  if (stats.aborted) return;
+  if (++stats.nodes > stats.nodeLimit) {
+    stats.aborted = true;
+    return;
+  }
   if (!propagate(ix, st)) return;
 
   const { whites, beams } = ix;

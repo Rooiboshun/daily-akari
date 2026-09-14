@@ -13,10 +13,12 @@ import {
   isWhite,
   hintOf,
   buildIndex,
+  solve,
   dailyPuzzle,
   DIFFICULTIES,
   todayString,
 } from './akari.js';
+import { PID, toUrl, fromUrl } from './puzzlink.js';
 
 // EMPTY はソルバでは「照明を置かないと決めたマス」。
 // UI ではプレイヤーが自分で付ける「×」印がそれにあたる。
@@ -51,7 +53,19 @@ const el = {
   overlayClose: document.getElementById('overlay-close'),
   busy: document.getElementById('busy'),
   seedline: document.getElementById('seedline'),
+  linkInput: document.getElementById('link-input'),
+  linkOpen: document.getElementById('link-open'),
+  linkOut: document.getElementById('link-out'),
+  linkCopy: document.getElementById('link-copy'),
+  linkMsg: document.getElementById('link-msg'),
 };
+
+/**
+ * 外から読み込んだ問題を解くときの探索の上限。
+ * 自分で作った問題は数ミリ秒で解けるが、他所から来た URL は
+ * 解が無いまま探索が膨らむことがあるので、画面が固まる前に諦める。
+ */
+const IMPORT_NODE_LIMIT = 300000;
 
 /** 今遊んでいる問題。盤面が変わるたび丸ごと入れ替える。 */
 let game = null;
@@ -63,6 +77,8 @@ let givenCells = new Set();
 let wrongCells = new Set();
 /** タップの意味。false = 照明 / true = ×印（スマホ用） */
 let markMode = false;
+/** 最後に遊んだ日替わりの難易度。読み込んだ問題から日付に戻るときの行き先 */
+let lastDifficulty = 'normal';
 
 // ------------------------------------------------------------------ 日付
 
@@ -74,29 +90,44 @@ function shiftDate(dateStr, days) {
   return todayString(dt);
 }
 
-/** URL の #2026-09-13/normal を読む。壊れていたら今日の normal。 */
+/**
+ * URL の # を読む。二通りある。
+ *   #2026-09-13/normal          日替わりの問題
+ *   #p/lightup/10/10/xxxx       読み込んだ問題（puzz.link と同じ本文）
+ * 壊れていたら今日の normal に落とす。
+ */
 function readHash() {
   const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (/^p\//i.test(raw)) {
+    try {
+      return { kind: 'link', link: fromUrl(raw) };
+    } catch {
+      // 読めない問題だった。日替わりに落ちる
+    }
+  }
   const [date, level] = raw.split('/');
   const okDate = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : TODAY;
   const okLevel = DIFFICULTIES[level] ? level : 'normal';
-  return { date: okDate > TODAY ? TODAY : okDate, difficulty: okLevel };
+  return { kind: 'daily', date: okDate > TODAY ? TODAY : okDate, difficulty: okLevel };
 }
 
-function writeHash(date, difficulty) {
-  const next = `#${date}/${difficulty}`;
+function writeHash(next) {
   if (location.hash !== next) history.replaceState(null, '', next);
+  return next;
 }
+
+const dailyHash = (date, difficulty) => `#${date}/${difficulty}`;
+const linkHash = (link) => `#p/${PID}/${link.w}/${link.h}/${link.body}`;
 
 // ------------------------------------------------------------------ 保存
 
-const storeKey = (date, difficulty) => `${STORE_PREFIX}${date}:${difficulty}`;
+const storeKey = (id) => `${STORE_PREFIX}${id}`;
 
 function saveProgress() {
   if (!game) return;
   try {
     localStorage.setItem(
-      storeKey(game.date, game.difficulty),
+      storeKey(game.id),
       JSON.stringify({
         s: Array.from(game.state).join(''),
         ms: elapsedMs(),
@@ -111,9 +142,9 @@ function saveProgress() {
   }
 }
 
-function loadProgress(date, difficulty, size) {
+function loadProgress(id, size) {
   try {
-    const raw = localStorage.getItem(storeKey(date, difficulty));
+    const raw = localStorage.getItem(storeKey(id));
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (typeof data.s !== 'string' || data.s.length !== size) return null;
@@ -279,7 +310,7 @@ function paint() {
   }
 
   el.board.classList.toggle('done', game.done || game.revealed);
-  el.seedline.textContent = `${game.date} / ${game.difficulty} · ヒント ${game.hintsUsed}`;
+  el.seedline.textContent = `${game.label} · ヒント ${game.hintsUsed}`;
 
   return info;
 }
@@ -484,15 +515,18 @@ function buildLevels() {
     b.className = 'chip';
     b.dataset.level = key;
     b.textContent = LEVEL_LABEL[key] || key;
-    b.addEventListener('click', () => load(game.date, key));
+    // 読み込んだ問題から難易度を選んだときは、今日の問題に戻る
+    b.addEventListener('click', () => load(game && game.date ? game.date : TODAY, key));
     el.levels.appendChild(b);
   }
 }
 
 function syncControls(date, difficulty) {
-  el.date.value = date;
+  // 読み込んだ問題のときは date が null。日付の並びは「今日へ戻る」ために生かす
+  el.date.value = date || TODAY;
   el.date.max = TODAY;
-  el.nextDay.disabled = date >= TODAY;
+  el.nextDay.disabled = !date || date >= TODAY;
+  el.prevDay.disabled = !date;
   el.today.disabled = date === TODAY;
   for (const b of el.levels.children) b.classList.toggle('on', b.dataset.level === difficulty);
 }
@@ -514,13 +548,61 @@ function afterPaint(fn) {
   setTimeout(run, 50);
 }
 
+/**
+ * 出来上がった問題を画面に載せる。日替わりでも読み込んだ問題でもここを通る。
+ * meta: { date, difficulty, id, label, hash, link }
+ */
+function install(made, meta) {
+  const size = made.puzzle.w * made.puzzle.h;
+  game = {
+    date: meta.date,
+    difficulty: meta.difficulty,
+    id: meta.id,
+    label: meta.label,
+    hash: meta.hash,
+    puzzle: made.puzzle,
+    solution: made.solution,
+    ix: buildIndex(made.puzzle),
+    state: new Int8Array(size),
+    accumMs: 0,
+    runningSince: null,
+    touched: false,
+    done: false,
+    revealed: false,
+    hintsUsed: 0,
+  };
+  givenCells = new Set();
+  wrongCells = new Set();
+
+  const saved = loadProgress(meta.id, size);
+  if (saved) {
+    for (let i = 0; i < size; i++) game.state[i] = Number(saved.s[i]) || 0;
+    game.accumMs = Number(saved.ms) || 0;
+    game.done = !!saved.done;
+    game.revealed = !!saved.revealed;
+    game.hintsUsed = Number(saved.hints) || 0;
+    game.touched = game.accumMs > 0;
+    if (Array.isArray(saved.given)) givenCells = new Set(saved.given);
+  }
+
+  buildBoard();
+  paint();
+  syncLinkOut();
+  el.busy.classList.add('hidden');
+}
+
+function beginLoad(busyText) {
+  el.overlay.classList.add('hidden');
+  el.busy.textContent = busyText;
+  el.busy.classList.remove('hidden');
+}
+
 /** 問題を作って画面に載せる。生成は一瞬だが、先に「作っています」を出してから回す。 */
 function load(date, difficulty) {
+  lastDifficulty = difficulty;
   syncControls(date, difficulty);
-  writeHash(date, difficulty);
-  el.overlay.classList.add('hidden');
-  el.busy.textContent = '問題を作っています…';
-  el.busy.classList.remove('hidden');
+  const hash = writeHash(dailyHash(date, difficulty));
+  beginLoad('問題を作っています…');
 
   // 描画を1フレーム挟まないと「作っています」が出ないまま固まって見える
   afterPaint(() => {
@@ -531,56 +613,80 @@ function load(date, difficulty) {
       el.busy.textContent = `問題を作れませんでした: ${err.message}`;
       return;
     }
-    const size = made.puzzle.w * made.puzzle.h;
-    game = {
+    install(made, {
       date,
       difficulty,
-      puzzle: made.puzzle,
-      solution: made.solution,
-      ix: buildIndex(made.puzzle),
-      state: new Int8Array(size),
-      accumMs: 0,
-      runningSince: null,
-      touched: false,
-      done: false,
-      revealed: false,
-      hintsUsed: 0,
-    };
-    givenCells = new Set();
-    wrongCells = new Set();
-
-    const saved = loadProgress(date, difficulty, size);
-    if (saved) {
-      for (let i = 0; i < size; i++) game.state[i] = Number(saved.s[i]) || 0;
-      game.accumMs = Number(saved.ms) || 0;
-      game.done = !!saved.done;
-      game.revealed = !!saved.revealed;
-      game.hintsUsed = Number(saved.hints) || 0;
-      game.touched = game.accumMs > 0;
-      if (Array.isArray(saved.given)) givenCells = new Set(saved.given);
-    }
-
-    buildBoard();
-    paint();
-    el.busy.classList.add('hidden');
+      id: `${date}:${difficulty}`,
+      label: `${date} / ${difficulty}`,
+      hash,
+    });
   });
 }
 
-el.prevDay.addEventListener('click', () => load(shiftDate(game.date, -1), game.difficulty));
+/** 読み込んだ問題（puzz.link の URL など）を解いてから画面に載せる。 */
+function loadLink(link) {
+  syncControls(null, null);
+  const hash = writeHash(linkHash(link));
+  beginLoad('問題を調べています…');
+
+  afterPaint(() => {
+    let r;
+    try {
+      r = solve(buildIndex(link.puzzle), 2, { nodeLimit: IMPORT_NODE_LIMIT });
+    } catch (err) {
+      el.busy.textContent = `問題を読めませんでした: ${err.message}`;
+      return;
+    }
+    if (r.count === 0) {
+      el.busy.textContent = r.aborted
+        ? 'この問題は手に負えませんでした（大きすぎるか、解がありません）'
+        : 'この問題には解がありません';
+      return;
+    }
+    install(
+      { puzzle: link.puzzle, solution: r.solutions[0] },
+      {
+        date: null,
+        difficulty: null,
+        id: `link:${link.w}x${link.h}:${link.body}`,
+        label: `読み込んだ問題 ${link.w}×${link.h}`,
+        hash,
+      },
+    );
+    setLinkMsg(
+      r.count > 1
+        ? '読み込みました。解が複数あるので、ヒントとまちがい探しはそのうちの1つを基準にします。'
+        : '読み込みました（解は1つ）。',
+      r.count > 1 ? 'warn' : 'ok',
+    );
+  });
+}
+
+/** # の中身に合わせて問題を切り替える。 */
+function apply(want) {
+  if (want.kind === 'link') loadLink(want.link);
+  else load(want.date, want.difficulty);
+}
+
+el.prevDay.addEventListener('click', () => {
+  if (game && game.date) load(shiftDate(game.date, -1), game.difficulty);
+});
 el.nextDay.addEventListener('click', () => {
+  if (!game || !game.date) return;
   const next = shiftDate(game.date, 1);
   if (next <= TODAY) load(next, game.difficulty);
 });
-el.today.addEventListener('click', () => load(TODAY, game.difficulty));
+el.today.addEventListener('click', () => load(TODAY, lastDifficulty));
 el.date.addEventListener('change', () => {
   const v = el.date.value;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v <= TODAY) load(v, game.difficulty);
-  else syncControls(game.date, game.difficulty);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v <= TODAY) load(v, lastDifficulty);
+  else syncControls(game ? game.date : TODAY, game ? game.difficulty : lastDifficulty);
 });
 
 window.addEventListener('hashchange', () => {
-  const { date, difficulty } = readHash();
-  if (!game || date !== game.date || difficulty !== game.difficulty) load(date, difficulty);
+  // 自分で書いた # なら何もしない（書き換えのたびに作り直さないため）
+  if (game && location.hash === game.hash) return;
+  apply(readHash());
 });
 
 window.addEventListener('pagehide', () => {
@@ -588,6 +694,76 @@ window.addEventListener('pagehide', () => {
   saveProgress();
 });
 
+// -------------------------------------------------------------- puzz.link
+
+function setLinkMsg(text, kind = '') {
+  if (!el.linkMsg) return;
+  el.linkMsg.textContent = text;
+  el.linkMsg.className = `link-msg${kind ? ` ${kind}` : ''}`;
+}
+
+/** 今の問題の puzz.link URL を、書き出し側のボタンに載せる。 */
+function syncLinkOut() {
+  if (!el.linkOut || !game) return;
+  let url = '';
+  try {
+    url = toUrl(game.puzzle);
+  } catch {
+    // 盤面が puzz.link で表せない形（今のところ起きない）
+  }
+  el.linkOut.href = url || '#';
+  el.linkOut.dataset.url = url;
+  el.linkOut.classList.toggle('disabled', !url);
+  if (el.linkCopy) el.linkCopy.disabled = !url;
+}
+
+if (el.linkOpen) {
+  el.linkOpen.addEventListener('click', () => {
+    const raw = el.linkInput ? el.linkInput.value : '';
+    if (!raw.trim()) {
+      setLinkMsg('puzz.link の URL を貼ってください', 'warn');
+      return;
+    }
+    let link;
+    try {
+      link = fromUrl(raw);
+    } catch (err) {
+      setLinkMsg(err.message, 'warn');
+      return;
+    }
+    setLinkMsg('読み込んでいます…');
+    loadLink(link);
+  });
+}
+
+if (el.linkInput) {
+  el.linkInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      el.linkOpen.click();
+    }
+  });
+}
+
+if (el.linkCopy) {
+  el.linkCopy.addEventListener('click', async () => {
+    const url = el.linkOut ? el.linkOut.dataset.url : '';
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkMsg('URL をコピーしました', 'ok');
+    } catch {
+      // 権限が無い / http でない。選べる形で出しておく
+      if (el.linkInput) {
+        el.linkInput.value = url;
+        el.linkInput.select();
+      }
+      setLinkMsg('コピーできなかったので、上の欄に入れました', 'warn');
+    }
+  });
+}
+
+// -------------------------------------------------------------- 起動
+
 buildLevels();
-const start = readHash();
-load(start.date, start.difficulty);
+apply(readHash());

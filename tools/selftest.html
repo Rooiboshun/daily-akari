@@ -152,6 +152,57 @@
         await settle(8);
         check('クリア済みが保存から戻る', $('state').textContent === 'クリア済み', $('state').textContent);
 
+        // 12. 今の問題を puzz.link 向けに書き出せる
+        const pl = await import('../src/puzzlink.js');
+        check(
+          '書き出し URL が今の問題と一致',
+          $('link-out').dataset.url === pl.toUrl(made.puzzle),
+          $('link-out').dataset.url,
+        );
+        check('書き出し URL が puzz.link の形', /^https:\/\/puzz\.link\/p\?lightup\/7\/7\//.test($('link-out').dataset.url));
+
+        // 13. puzz.link の URL を貼ると、その問題に切り替わる
+        const other = akari.dailyPuzzle('2026-08-20', 'easy');
+        const otherUrl = pl.toUrl(other.puzzle);
+        $('link-input').value = otherUrl;
+        click($('link-open'));
+        await settle(10);
+        check('読み込んだ問題に切り替わる', $('seedline').textContent.includes('読み込んだ問題'), $('seedline').textContent);
+        check('URL に読み込んだ問題が乗る', location.hash.startsWith('#p/lightup/7/7/'), location.hash);
+        check('「調べています」が消えている', $('busy').classList.contains('hidden'), $('busy').textContent);
+
+        // 盤面が貼った問題どおりに描けているか（黒マスの位置と数字で照合）
+        const on = $('board').querySelectorAll('.cell');
+        let sameBoard = on.length === other.puzzle.w * other.puzzle.h;
+        for (let i = 0; sameBoard && i < on.length; i++) {
+          const c = other.puzzle.cells[i];
+          const isBlackCell = on[i].classList.contains('black');
+          if (isBlackCell !== (c !== akari.WHITE)) sameBoard = false;
+          else if (isBlackCell && on[i].textContent !== (c >= 0 ? String(c) : '')) sameBoard = false;
+        }
+        check('貼った問題どおりの盤面になる', sameBoard);
+
+        // 14. 読み込んだ問題も最後まで遊べる（答えどおり置くとクリア）
+        const cellAt2 = (i) => $('board').querySelector(`.cell.white[data-i="${i}"]`);
+        for (let i = 0; i < other.puzzle.w * other.puzzle.h; i++) {
+          if (other.solution[i] === akari.LAMP) click(cellAt2(i));
+        }
+        await settle(2);
+        check('読み込んだ問題でもクリアになる', $('overlay-title').textContent === 'クリア！' && !$('overlay').classList.contains('hidden'));
+
+        // 15. 美術館ではない URL は断る（盤面は今のまま）
+        const keep = location.hash;
+        $('link-input').value = 'https://puzz.link/p?nurikabe/3/3/g';
+        click($('link-open'));
+        await settle(2);
+        check('別の種類の URL は断る', $('link-msg').classList.contains('warn'), $('link-msg').textContent);
+        check('断ったときは盤面を変えない', location.hash === keep, location.hash);
+
+        // 16. 「今日」で日替わりに戻れる
+        click($('today'));
+        await settle(10);
+        check('今日に戻れる', location.hash === `#${akari.todayString()}/${LEVEL}`, location.hash);
+
         finish(null);
       } catch (err) {
         finish(`${err && err.message}\n${err && err.stack}`);

@@ -7,6 +7,7 @@
  */
 
 import { render, dailyPuzzle, todayString, DIFFICULTIES } from '../src/akari.js';
+import { toUrl } from '../src/puzzlink.js';
 
 const args = process.argv.slice(2);
 const showAnswer = args.includes('-a') || args.includes('--answer');
@@ -37,3 +38,5 @@ console.log(
   `\n黒マス ${res.stats.blacks} / 数字 ${res.stats.hints} / 照明 ${res.stats.lamps} / ` +
     `${res.stats.logicOnly ? '分岐なしで解ける' : '試行錯誤が要る'}`
 );
+// この URL を puzz.link に貼れば、同じ問題が向こうの盤面で開く（符号化の目視確認用）
+console.log(`puzz.link: ${toUrl(res.puzzle)}`);

@@ -289,6 +289,98 @@ main {
   text-align: center;
 }
 
+/* puzz.link と行き来する欄（既定は畳んである） */
+.share {
+  width: 100%;
+  max-width: 460px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 12px;
+}
+
+.share > summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  color: var(--dim);
+  list-style: none;
+}
+
+.share > summary::-webkit-details-marker {
+  display: none;
+}
+
+.share > summary::before {
+  content: "▸ ";
+}
+
+.share[open] > summary::before {
+  content: "▾ ";
+}
+
+.share-body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-note {
+  margin: 0;
+  color: var(--dim);
+  line-height: 1.7;
+}
+
+.share-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.link-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.link-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn.link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn.link.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.link-msg {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+.link-msg.ok {
+  color: var(--ok);
+}
+
+.link-msg.warn {
+  color: var(--ng);
+}
+
 .foot {
   font-size: 11px;
   color: #6b6d75;

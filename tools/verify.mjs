@@ -9,6 +9,8 @@
  *   C. 出てきた解がルールを満たしている
  *   D. 数字が極小になっている（どれか1つ外すと条件が崩れる）
  *   E. 同じ日付なら必ず同じ問題が出る（日替わりが決定的）
+ *   F. puzz.link の URL と盤面が往復できる
+ *   G. 探索の打ち切り（nodeLimit）が効く
  */
 
 import {
@@ -27,6 +29,7 @@ import {
   LAMP,
   hintOf,
 } from '../src/akari.js';
+import { encodeBody, decodeBody, toUrl, fromUrl } from '../src/puzzlink.js';
 
 let pass = 0;
 let fail = 0;
@@ -223,6 +226,108 @@ check('日付が違えば別の問題になる', seen.size === dates.length, `�
   const easy = render(dailyPuzzle('2026-09-13', 'easy').puzzle);
   const normal = render(dailyPuzzle('2026-09-13', 'normal').puzzle);
   check('同じ日でも難易度が違えば別の問題', easy !== normal);
+}
+
+// ------------------------------------------------------------- F. puzz.link
+
+console.log('F. puzz.link の URL との往復');
+
+{
+  // F1. 手で解いた符号との照合。
+  //   1.. → 'b'(=10+1 で「数字1＋白2」), 続く白1 → 'g', '#' → '.',
+  //   白3 → 'i'(=15+3), 末尾の 2 → 'c'(=10+2)
+  const text = '1..\n.#.\n..2';
+  const p = parse(text);
+  check('手計算した符号と一致', encodeBody(p) === 'bg.ic', `実際 ${encodeBody(p)}`);
+  check('その本文を読み直すと元の盤面', render(decodeBody('bg.ic', 3, 3)) === text, render(decodeBody('bg.ic', 3, 3)));
+  check(
+    'URL の形',
+    toUrl(p) === 'https://puzz.link/p?lightup/3/3/bg.ic',
+    toUrl(p),
+  );
+
+  // F2. 白だけの盤面は「白が何個続くか」1文字に潰れる（'g'=1 … 'z'=20）
+  check('2x2 全白は j', encodeBody(parse('..\n..')) === 'j', encodeBody(parse('..\n..')));
+  const w21 = { w: 21, h: 1, cells: new Int8Array(21).fill(-1) };
+  check('白21個は zg（20 で一度切る）', encodeBody(w21) === 'zg', encodeBody(w21));
+  check('白21個を読み直すと 21 マス', decodeBody('zg', 21, 1).cells.every((c) => c === -1));
+
+  // F2b. 縦横の順番。pzprjs の parser は「先に横、後に縦」。
+  // ここを取り違えると正方形以外の問題だけが静かに壊れるので明示的に固定する。
+  const wide = parse('.....\n.....\n....1');
+  check('URL は 横/縦 の順（5x3 → 5/3）', toUrl(wide).includes('lightup/5/3/'), toUrl(wide));
+  check('横長の盤面が往復する', render(fromUrl(toUrl(wide)).puzzle) === render(wide));
+  const tall = parse('...\n...\n...\n...\n..1');
+  check('URL は 横/縦 の順（3x5 → 3/5）', toUrl(tall).includes('lightup/3/5/'), toUrl(tall));
+  check('縦長と横長が別の URL になる', toUrl(wide) !== toUrl(tall));
+
+  // F3. URL の受け取り方の揺れ
+  const forms = [
+    'https://puzz.link/p?lightup/3/3/bg.ic',
+    'https://pzpr.jp/p.html?lightup/3/3/bg.ic',
+    'lightup/3/3/bg.ic',
+    '#p/lightup/3/3/bg.ic',
+    '  https://puzz.link/p?lightup/3/3/bg.ic  ',
+  ];
+  for (const f of forms) {
+    check(`${f.trim().slice(0, 34)} を読める`, render(fromUrl(f).puzzle) === text);
+  }
+  check('本文が無ければ断る', (() => { try { fromUrl('lightup/3/3/'); return false; } catch { return true; } })());
+  check('別の種類のパズルは断る', (() => { try { fromUrl('https://puzz.link/p?nurikabe/3/3/g'); return false; } catch { return true; } })());
+  check('読めない文字は断る', (() => { try { decodeBody('bg!ic', 3, 3); return false; } catch { return true; } })());
+  check('大きすぎる盤面は断る', (() => { try { decodeBody('g', 100, 100); return false; } catch { return true; } })());
+
+  // F4. ランダムな盤面 400 枚で往復（数字と黒と白の並びを総当たりに近い形で当てる）
+  const rng = makeRng(seedFrom('puzzlink-roundtrip'));
+  let bad = 0;
+  let firstBad = '';
+  for (let t = 0; t < 400; t++) {
+    const w = 1 + Math.floor(rng() * 9);
+    const h = 1 + Math.floor(rng() * 9);
+    const cells = new Int8Array(w * h).fill(-1);
+    for (let i = 0; i < w * h; i++) {
+      const r = rng();
+      if (r < 0.2) cells[i] = Math.floor(rng() * 5); // 数字つき黒
+      else if (r < 0.35) cells[i] = BLACK; // 数字なし黒
+    }
+    const board = { w, h, cells };
+    const back = decodeBody(encodeBody(board), w, h);
+    if (render(back) !== render(board)) {
+      bad++;
+      if (!firstBad) firstBad = `${w}x${h}\n${render(board)}\n--- 読み直し ---\n${render(back)}`;
+    }
+  }
+  check('ランダム 400 枚が往復する', bad === 0, `${bad} 枚がずれた\n${firstBad}`);
+
+  // F5. 日替わりの問題も往復する（実際に貼る URL はこれ）
+  for (const name of Object.keys(DIFFICULTIES)) {
+    const made = dailyPuzzle('2026-09-14', name);
+    const link = fromUrl(toUrl(made.puzzle));
+    check(`${name} の今日の問題が往復する`, render(link.puzzle) === render(made.puzzle));
+    check(`${name} の往復後も解が一意`, solve(buildIndex(link.puzzle), 2).count === 1);
+  }
+}
+
+// ------------------------------------------------------- G. 探索の打ち切り
+
+console.log('G. 探索の打ち切り');
+
+{
+  // 大きな全白盤面。解の数え上げは重いが、打ち切りがあれば必ず戻ってくる
+  const big = { w: 12, h: 12, cells: new Int8Array(144).fill(-1) };
+  const ix = buildIndex(big);
+  const capped = solve(ix, 1 << 30, { nodeLimit: 500 });
+  check('nodeLimit で打ち切られる', capped.aborted === true);
+  check('打ち切ったら節の数が上限を超えない', capped.nodes <= 501, `実際 ${capped.nodes}`);
+
+  // 打ち切らない呼び方では今までどおり（既定は無制限）
+  const normal = solve(buildIndex(parse('#1#\n1.1\n#1#')), 5);
+  check('上限を渡さなければ今までどおり解ける', normal.count === 1 && !normal.aborted);
+  check('上限を渡さなければ logicOnly も今までどおり', normal.logicOnly === true);
+
+  // 上限が十分なら打ち切られない
+  const enough = solve(buildIndex(parse('....')), 10, { nodeLimit: 100000 });
+  check('上限が十分なら打ち切られない', enough.count === 4 && !enough.aborted, `実際 ${enough.count}`);
 }
 
 // ---------------------------------------------------------------- まとめ

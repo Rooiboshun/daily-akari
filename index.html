@@ -51,6 +51,33 @@
         白マスをクリックで照明。右クリック（スマホは長押し、または「タップ:」ボタンの切り替え）で「置かない」印。
         照明はぶつかり合ってはいけません。数字は接する照明の本数です。
       </p>
+
+      <details class="share" id="share">
+        <summary>puzz.link と行き来する</summary>
+        <div class="share-body">
+          <p class="share-note">
+            puzz.link の美術館（lightup）の URL を貼れば、その問題をここで解けます。
+            逆に、今の問題の URL を puzz.link 向けに書き出すこともできます。
+          </p>
+          <div class="share-row">
+            <input
+              id="link-input"
+              class="link-input"
+              type="text"
+              inputmode="url"
+              spellcheck="false"
+              placeholder="https://puzz.link/p?lightup/10/10/…"
+              aria-label="puzz.link の URL"
+            />
+            <button id="link-open" class="btn">この URL を解く</button>
+          </div>
+          <div class="share-row">
+            <a id="link-out" class="btn link" target="_blank" rel="noreferrer noopener">今の問題を puzz.link で開く</a>
+            <button id="link-copy" class="btn">URL をコピー</button>
+          </div>
+          <p id="link-msg" class="link-msg"></p>
+        </div>
+      </details>
     </main>
 
     <footer class="foot">
