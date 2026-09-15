@@ -2,6 +2,8 @@
 
 美術館パズル（Akari / Light Up）の日替わり版。
 
+**遊ぶ → <https://rooiboshun.github.io/daily-akari/>**
+
 ソルバ・一意解ジェネレータ・遊ぶ画面まで入っています。依存パッケージもビルドも
 無く、`index.html` を置くだけで動きます。
 実装されているものの一覧は [docs/FEATURES.md](docs/FEATURES.md) にあります。
@@ -99,9 +101,12 @@ ES モジュールは `file://` では読めないので、手元で開くとき
 
 ## 公開
 
-まだ公開していません。置き場所の候補と、確かめてあること（相対パスだけで
-書いてあるのでサブディレクトリでも動く、保存キーが他の作品とぶつからない、
-外部への通信が無い）は [docs/DEPLOY.md](docs/DEPLOY.md) にあります。
+<https://rooiboshun.github.io/daily-akari/> で公開しています（GitHub Pages、
+master の root をそのまま配信）。更新は master へ push するだけで反映されます。
+
+経緯と、確かめてあること（相対パスだけで書いてあるのでサブディレクトリでも動く、
+保存キーが他の作品とぶつからない、外部への通信が無い）は
+[docs/DEPLOY.md](docs/DEPLOY.md) にあります。
 
 ## 元ネタ
 

@@ -235,14 +235,19 @@ hard 平均 7.4ms（最悪 44.4ms）。
 
 ## 公開 (`docs/DEPLOY.md`)
 
-置き場所の2択（このリポジトリを Pages にする / `rooiboshun.github.io` の
-サブディレクトリに置く）と、確かめてあること（相対パスのみ・localStorage の
-接頭辞・外部通信なし・`.nojekyll` 不要）を `docs/DEPLOY.md` にまとめてある。
-**公開そのものは未実施**（push も Pages の有効化もしていない）。
+**<https://rooiboshun.github.io/daily-akari/> で公開中**（2026-09-16〜）。
+
+置き場所は2択だったが、このリポジトリをそのまま GitHub Pages にする案 A を
+採った（master の root を配信）。更新は master へ push するだけで反映され、
+ビルドも CI も挟まらない。公開直後に `/` と `src/` の4ファイルがすべて 200 で
+返り、`.js` の MIME が `application/javascript`（ES モジュールが読める形）で
+あることを実測した。
+
+確かめてあること（相対パスのみ・localStorage の接頭辞・外部通信なし・
+`.nojekyll` 不要）と手順は `docs/DEPLOY.md`。
 
 ## まだ無いもの
 
-- 公開（GitHub Pages への配置。push・マージはまだしていない → `docs/DEPLOY.md`）
 - 本物の puzz.link での目視確認（上の「まだ手で確かめていないこと」）
 - OGP 画像（SNS に貼っても絵が出ない）
 - 連続クリア記録・統計・結果の共有文
