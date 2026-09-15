@@ -1,0 +1,400 @@
+/* 日替わり美術館 — 見た目だけ。盤面のルールは akari.js、操作は ui.js。 */
+
+:root {
+  --bg: #16171b;
+  --panel: #1e2026;
+  --line: #2c2f37;
+  --ink: #e8e6e1;
+  --dim: #9a9ba1;
+  --white-cell: #f2efe6;
+  --white-ink: #2a2b30;
+  --lit: #ffe9a8;
+  --lit-strong: #ffd870;
+  --black-cell: #2a2c33;
+  --accent: #7fb2ff;
+  --ok: #6ed08a;
+  --ng: #ff6b6b;
+  --cell: 44px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 16px 12px 28px;
+  gap: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
+.top {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+h1 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.dates,
+.levels,
+.tools,
+.status {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.chip,
+.btn {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.chip:hover,
+.btn:hover {
+  border-color: #414653;
+}
+
+.chip.date {
+  padding: 6px 8px;
+  color-scheme: dark;
+}
+
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #10131a;
+  font-weight: 600;
+}
+
+.btn.danger {
+  color: #ffb3b3;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+main {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.board-wrap {
+  position: relative;
+}
+
+.board {
+  display: grid;
+  gap: 2px;
+  background: var(--line);
+  padding: 2px;
+  border-radius: 6px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell {
+  width: var(--cell);
+  height: var(--cell);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: calc(var(--cell) * 0.44);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.cell.black {
+  background: var(--black-cell);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.cell.black.sat {
+  color: var(--ok);
+}
+
+.cell.black.over {
+  color: var(--ng);
+  background: #3a2a2c;
+}
+
+.cell.white {
+  background: var(--white-cell);
+  color: var(--white-ink);
+  cursor: pointer;
+}
+
+.cell.white.lit {
+  background: var(--lit);
+}
+
+.cell.white.lamp {
+  background: var(--lit-strong);
+}
+
+.cell.white.lamp::after {
+  content: "";
+  width: 52%;
+  height: 52%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fffdf2, #ffb43a 70%, #e8892a);
+  box-shadow: 0 0 10px rgba(255, 190, 90, 0.75);
+}
+
+.cell.white.clash {
+  background: #ffb2b2;
+}
+
+.cell.white.clash::after {
+  background: radial-gradient(circle at 35% 30%, #fff0f0, #ff5a5a 70%, #c22);
+  box-shadow: 0 0 10px rgba(255, 90, 90, 0.8);
+}
+
+.cell.white.mark::after {
+  content: "×";
+  color: #9b998f;
+  font-size: calc(var(--cell) * 0.5);
+  line-height: 1;
+}
+
+.cell.white.wrong {
+  outline: 3px solid var(--ng);
+  outline-offset: -3px;
+}
+
+.cell.white.given {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cell.white:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.board.done .cell.white {
+  cursor: default;
+}
+
+.overlay,
+.busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 13, 16, 0.72);
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
+}
+
+.overlay-card {
+  text-align: center;
+  padding: 18px 22px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.overlay-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--lit-strong);
+}
+
+.overlay-body {
+  font-size: 13px;
+  color: var(--dim);
+  white-space: pre-line;
+}
+
+.busy {
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.hidden {
+  display: none;
+}
+
+.status {
+  font-size: 13px;
+  color: var(--dim);
+  gap: 14px;
+}
+
+.stat {
+  font-variant-numeric: tabular-nums;
+}
+
+.state.ok {
+  color: var(--ok);
+}
+
+.state.ng {
+  color: var(--ng);
+}
+
+.howto {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--dim);
+  margin: 0;
+  max-width: 460px;
+  text-align: center;
+}
+
+/* puzz.link と行き来する欄（既定は畳んである） */
+.share {
+  width: 100%;
+  max-width: 460px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 12px;
+}
+
+.share > summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  color: var(--dim);
+  list-style: none;
+}
+
+.share > summary::-webkit-details-marker {
+  display: none;
+}
+
+.share > summary::before {
+  content: "▸ ";
+}
+
+.share[open] > summary::before {
+  content: "▾ ";
+}
+
+.share-body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-note {
+  margin: 0;
+  color: var(--dim);
+  line-height: 1.7;
+}
+
+.share-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.link-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.link-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn.link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn.link.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.link-msg {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+.link-msg.ok {
+  color: var(--ok);
+}
+
+.link-msg.warn {
+  color: var(--ng);
+}
+
+.foot {
+  font-size: 11px;
+  color: #6b6d75;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.foot a {
+  color: #6b6d75;
+}
+
+@media (max-width: 430px) {
+  :root {
+    --cell: 34px;
+  }
+}

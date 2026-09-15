@@ -1,0 +1,14 @@
+{
+  "name": "daily-akari",
+  "version": "0.1.0",
+  "description": "美術館(Akari)の日替わりパズル。ソルバと一意解ジェネレータ。",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "verify": "node tools/verify.mjs",
+    "soak": "node tools/soak.mjs",
+    "uitest": "node tools/uitest.mjs",
+    "serve": "node tools/serve.mjs",
+    "peek": "node tools/peek.mjs"
+  }
+}
