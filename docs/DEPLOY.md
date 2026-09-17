@@ -34,7 +34,8 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 | `feat/akari-puzzlink-io` | `7551c12` | 入っている |
 | `chore/akari-solver-recheck` | `3e9fd9b` | **入っていないが、役目は終わっている**（下記） |
 | `chore/akari-puzzlink-upstream-vector` | `f76f6f2` | **未合流** |
-| `chore/akari-pages-merge-followup` | `1b98675` | **未合流**（この文書自身が載っている枝） |
+| `chore/akari-pages-merge-followup` | `1b98675` | **未合流**。下の `chore/akari-branch-audit` がこの上に載っている |
+| `chore/akari-branch-audit` | `6de8fd2` | **未合流**（この表自身が載っている枝。`1b98675` の上） |
 
 `chore/akari-solver-recheck` が役目を終えたと言えるのは、次の2点を実際に
 確かめたから（「同じ題の双子だから」という見立てではない）:
@@ -46,10 +47,17 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
   この枝にあって master に無い行は「UI はまだありません」のような公開前の
   古い記述だけで、拾うべき中身は残っていない
 
-**残っている生きた枝は `chore/akari-puzzlink-upstream-vector` と
-`chore/akari-pages-merge-followup` の2本で、これは直列ではなく並列**。
-どちらも `ee17e9d`（master の先端）から直接生えた1コミットの枝なので、
-**片方を合流しても、もう片方は入らない**。片方だけ入れて済ませないこと。
+**残っている生きた枝は次の2系統で、これは直列ではなく並列**。どちらも
+`ee17e9d`（master の先端）から生えているので、**片方を合流しても、もう片方は
+入らない**。片方だけ入れて済ませないこと。
+
+| 合流するならここ | 中に入るもの |
+|---|---|
+| `chore/akari-branch-audit` (`6de8fd2`) | `1b98675`（`puzzlink.js` の抜けの修正）＋この枝の確認結果 |
+| `chore/akari-puzzlink-upstream-vector` (`f76f6f2`) | 符号化を上流の問題で裏づけた `verify` の F6 |
+
+`chore/akari-pages-merge-followup` を直接指す必要は無い（`chore/akari-branch-audit`
+がその上に載っているので、こちらを合流すれば一緒に入る）。
 
 幸い中身は衝突しない（`git merge-tree --write-tree 1b98675 f76f6f2` が
 衝突なしで完了する。同じ `docs/DEPLOY.md` `docs/FEATURES.md` を触っているが
