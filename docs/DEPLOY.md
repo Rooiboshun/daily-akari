@@ -21,12 +21,39 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 
 合流は済んでいるので、**公開前に積んであった作業ブランチはもう master に全部入っている**
 （`e029731` ソルバ → `d9a58af` 遊ぶ画面 → `5535133` 日替わりの穴の修正 →
-`a16d746` サブパス公開の検証 → `7551c12` puzz.link 相互変換）。残っている枝は2本だけ:
+`a16d746` サブパス公開の検証 → `7551c12` puzz.link 相互変換）。
 
-| 枝 | 状態 |
-|---|---|
-| `chore/akari-solver-recheck` (`3e9fd9b`) | **役目を終えた**。中身は `5535133` として master に入っており、こちらは同じ修正をソルバ枝の上に載せた双子。消してよい |
-| `chore/akari-puzzlink-upstream-vector` (`f76f6f2`) | **未合流**。符号化を上流の問題で裏づけた分で、別途判断 |
+### 枝の全部（2026-09-18 に `git merge-base --is-ancestor <枝> master` で全数確認）
+
+| 枝 | 先端 | master に入っているか |
+|---|---|---|
+| `feat/akari-solver-generator` | `e029731` | 入っている |
+| `feat/akari-play-ui` | `d9a58af` | 入っている |
+| `fix/akari-daily-gap-on-ui` | `5535133` | 入っている |
+| `chore/akari-pages-readiness` | `a16d746` | 入っている |
+| `feat/akari-puzzlink-io` | `7551c12` | 入っている |
+| `chore/akari-solver-recheck` | `3e9fd9b` | **入っていないが、役目は終わっている**（下記） |
+| `chore/akari-puzzlink-upstream-vector` | `f76f6f2` | **未合流** |
+| `chore/akari-pages-merge-followup` | `1b98675` | **未合流**（この文書自身が載っている枝） |
+
+`chore/akari-solver-recheck` が役目を終えたと言えるのは、次の2点を実際に
+確かめたから（「同じ題の双子だから」という見立てではない）:
+
+- `3e9fd9b` と `5535133` の `src/akari.js` への差分は**一字一句同じ**で、
+  触っているファイルも同じ4つ（`docs/FEATURES.md` `package.json`
+  `src/akari.js` `tools/soak.mjs`）。master には `5535133` の側が入っている
+- `git diff master chore/akari-solver-recheck` は**ほぼ全部が削除**になる。
+  この枝にあって master に無い行は「UI はまだありません」のような公開前の
+  古い記述だけで、拾うべき中身は残っていない
+
+**残っている生きた枝は `chore/akari-puzzlink-upstream-vector` と
+`chore/akari-pages-merge-followup` の2本で、これは直列ではなく並列**。
+どちらも `ee17e9d`（master の先端）から直接生えた1コミットの枝なので、
+**片方を合流しても、もう片方は入らない**。片方だけ入れて済ませないこと。
+
+幸い中身は衝突しない（`git merge-tree --write-tree 1b98675 f76f6f2` が
+衝突なしで完了する。同じ `docs/DEPLOY.md` `docs/FEATURES.md` を触っているが
+別の節）。合流するなら順番はどちらからでもよい。
 
 公開直後に実測した配信（すべて 200、MIME も正しい）:
 
