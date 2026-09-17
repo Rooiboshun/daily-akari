@@ -35,7 +35,7 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 | `chore/akari-solver-recheck` | `3e9fd9b` | **入っていないが、役目は終わっている**（下記） |
 | `chore/akari-puzzlink-upstream-vector` | `f76f6f2` | **未合流** |
 | `chore/akari-pages-merge-followup` | `1b98675` | **未合流**。下の `chore/akari-branch-audit` がこの上に載っている |
-| `chore/akari-branch-audit` | `6de8fd2` | **未合流**（この表自身が載っている枝。`1b98675` の上） |
+| `chore/akari-branch-audit` | （先端） | **未合流**（この表自身が載っている枝。`1b98675` の上。先端は動くので短縮ハッシュは書かない） |
 
 `chore/akari-solver-recheck` が役目を終えたと言えるのは、次の2点を実際に
 確かめたから（「同じ題の双子だから」という見立てではない）:
@@ -53,7 +53,7 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 
 | 合流するならここ | 中に入るもの |
 |---|---|
-| `chore/akari-branch-audit` (`6de8fd2`) | `1b98675`（`puzzlink.js` の抜けの修正）＋この枝の確認結果 |
+| `chore/akari-branch-audit` の**先端** | `1b98675`（`puzzlink.js` の抜けの修正）＋この枝の確認結果 |
 | `chore/akari-puzzlink-upstream-vector` (`f76f6f2`) | 符号化を上流の問題で裏づけた `verify` の F6 |
 
 `chore/akari-pages-merge-followup` を直接指す必要は無い（`chore/akari-branch-audit`
