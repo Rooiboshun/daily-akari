@@ -4,7 +4,7 @@
 CI も無いので、公開に必要なのは **どこへ置くかを決めること** だけ。
 判断材料と手順をここにまとめる。
 
-最終更新: 2026-09-16（**公開済み**。案 A を採った）
+最終更新: 2026-09-18（**公開済み**。案 A を採った。公開後の master で再検証済み）
 
 ## 今どうなっているか
 
@@ -18,6 +18,15 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 3. `gh api -X POST repos/Rooiboshun/daily-akari/pages -f "source[branch]=master" -f "source[path]=/"`
 
 以後の更新は **master へ push するだけ**で反映される。ビルドも CI も無い。
+
+合流は済んでいるので、**公開前に積んであった作業ブランチはもう master に全部入っている**
+（`e029731` ソルバ → `d9a58af` 遊ぶ画面 → `5535133` 日替わりの穴の修正 →
+`a16d746` サブパス公開の検証 → `7551c12` puzz.link 相互変換）。残っている枝は2本だけ:
+
+| 枝 | 状態 |
+|---|---|
+| `chore/akari-solver-recheck` (`3e9fd9b`) | **役目を終えた**。中身は `5535133` として master に入っており、こちらは同じ修正をソルバ枝の上に載せた双子。消してよい |
+| `chore/akari-puzzlink-upstream-vector` (`f76f6f2`) | **未合流**。符号化を上流の問題で裏づけた分で、別途判断 |
 
 公開直後に実測した配信（すべて 200、MIME も正しい）:
 
@@ -41,12 +50,18 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 ```
 index.html
 src/akari.js
+src/puzzlink.js
 src/ui.js
 src/style.css
 ```
 
 `tools/` `docs/` `package.json` `README.md` は無くても動く（置いたままでも
 害は無い。GitHub Pages は単に配るだけで、`package.json` を見てビルドしたりしない）。
+
+> `src/puzzlink.js` を**落とすと画面が真っ白になる**。`ui.js` が
+> `import { PID, toUrl, fromUrl } from './puzzlink.js'` で読んでいて、ES モジュールは
+> 1つでも解決に失敗するとモジュール全体が実行されないため、盤面すら描かれない。
+> 案 B（`rooiboshun.github.io` へコピー）を採るならここが唯一の落とし穴。
 
 ## 置き場所は2択（採ったのは A）
 
@@ -77,7 +92,7 @@ Source を `master` / `/ (root)` にする。URL は
   `src/ui.js`、`ui.js` の import は `./akari.js` と `./puzzlink.js` で、
   すべて相対パス。絶対パス（`/src/...`）は1つも無い。`npm run uitest` は
   root 配信と `/daily-akari` 配信の両方で同じ32項目を回していて、
-  2026-09-14 時点で 64/64 通過（`npm run serve -- 8123 /daily-akari/` で
+  2026-09-18 に公開後の master で再測して 64/64 通過（`npm run serve -- 8123 /daily-akari/` で
   目でも確かめられる）
 - **localStorage が他の作品とぶつからない** — `rooiboshun.github.io` は
   作品どうしで localStorage を共有する（オリジンが同じ）。保存キーは
@@ -92,7 +107,8 @@ Source を `master` / `/ (root)` にする。URL は
 - **Jekyll に邪魔されない** — `_` で始まるファイル・ディレクトリが無いので
   `.nojekyll` は要らない
 - **問題はその場で作る** — サーバも DB もアーカイブも要らない。生成は
-  最悪でも 45ms 程度（`npm run soak` の実測）なので、開いた瞬間に出る
+  最悪でも 73ms 程度（2026-09-18 の `npm run soak` 1095 問の実測。中央値は
+  easy 1.1ms / normal 5.6ms / hard 8.6ms）なので、開いた瞬間に出る
 
 ## まだ決めていないこと
 
