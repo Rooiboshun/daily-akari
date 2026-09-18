@@ -448,6 +448,14 @@ function fillAllHints(puzzle, st) {
 }
 
 /**
+ * `generate` が諦めるまでの既定の試行回数。
+ *
+ * 道具側（`tools/soak.mjs`）が「実際に何回目で当たったか」と突き合わせて
+ * 余裕を測るので、数値をそちらへ書き写さず、ここを唯一の出どころにする。
+ */
+export const DEFAULT_ATTEMPTS = 2000;
+
+/**
  * 一意解の問題を1つ作る。
  *
  * 手順は「完成形を作る → 全黒マスに数字を入れる → 数字を1つずつ外し、
@@ -461,15 +469,27 @@ function fillAllHints(puzzle, st) {
  * @param {number} opt.blackRatio 黒マスの割合（既定 0.2）
  * @param {Function} opt.rng 0..1 の乱数。省略時は Math.random
  * @param {boolean} opt.logicOnly true なら「分岐なしで解ける」問題だけ作る
- * @param {number} opt.attempts 諦めるまでの試行回数（既定 2000）
+ * @param {number} opt.attempts 諦めるまでの試行回数（既定 DEFAULT_ATTEMPTS = 2000）
  *
- * 試行回数について: 盤面の採用率は実測で easy 10.3% / normal 3.8% / hard 1.9%
- * （難易度ごとに 60 回生成して計測）。捨てられる理由はほぼ全部
- * 「全黒マスに数字を入れてもなお解が一意にならない」で、1回の試行は 0.3ms 程度。
- * 既定が 200 回だった頃は hard が 2% ほどの確率で丸ごと失敗し、種が日付で
- * 決まる dailyPuzzle では特定の日（2027-01-01 と 2027-06-21）が必ず
- * 「作れませんでした」になっていた。2000 回なら hard でも失敗する見込みは
- * 1e-17 程度。成功する種では打ち切り回数を増やしても出来上がる問題は変わらない。
+ * 試行回数について: 盤面の採用率は実測で easy 10.3% / normal 3.3% / hard 2.4%
+ * （日替わり 730 日ぶん 2190 問の総試行回数から逆算。難易度ごとに 60 回だけ
+ * 生成して出した旧値 normal 3.8% / hard 1.9% はここで置き換えた）。
+ * 捨てられる理由はほぼ全部「全黒マスに数字を入れてもなお解が一意にならない」で、
+ * 1回の試行は 0.19〜0.33ms 程度。
+ *
+ * 既定が 200 回だった頃は、種が日付で決まる dailyPuzzle において
+ * 特定の日（2027-01-01 と 2027-06-21）が必ず「作れませんでした」になっていた。
+ * これは確率的な事故ではなく、実際に必要な回数が 200 を超える日が
+ * 素で存在したということ: 同じ 730 日を測ると、当たるまでに要した回数は
+ * hard で最悪 241 回（2027-10-30）、normal で 167 回、easy で 58 回だった。
+ *
+ * 2000 回は、その実測の最悪値（241）に対して約 8 倍の余裕がある。
+ * 幾何分布で見ても hard の失敗見込みは 1e-21 程度。成功する種では
+ * 打ち切り回数を増やしても出来上がる問題は変わらない。
+ *
+ * この余裕は `npm run soak` が毎回報告する。採用率が下がる向きの変更
+ * （blackRatio や logicOnly を触るなど）を入れると、失敗 0 件のまま
+ * 余裕だけが削れていくので、そちらを早期警報として見ること。
  */
 export function generate(opt = {}) {
   const {
@@ -478,7 +498,7 @@ export function generate(opt = {}) {
     blackRatio = 0.2,
     rng = Math.random,
     logicOnly = true,
-    attempts = 2000,
+    attempts = DEFAULT_ATTEMPTS,
   } = opt;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
