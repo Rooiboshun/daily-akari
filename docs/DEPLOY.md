@@ -32,10 +32,11 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 | `fix/akari-daily-gap-on-ui` | `5535133` | 入っている |
 | `chore/akari-pages-readiness` | `a16d746` | 入っている |
 | `feat/akari-puzzlink-io` | `7551c12` | 入っている |
-| `chore/akari-solver-recheck` | `3e9fd9b` | **入っていないが、役目は終わっている**（下記） |
-| `chore/akari-puzzlink-upstream-vector` | `f76f6f2` | **未合流** |
-| `chore/akari-pages-merge-followup` | `1b98675` | **未合流**。下の `chore/akari-branch-audit` がこの上に載っている |
-| `chore/akari-branch-audit` | （先端） | **未合流**（この表自身が載っている枝。`1b98675` の上。先端は動くので短縮ハッシュは書かない） |
+| `chore/akari-solver-recheck` | `3e9fd9b` | **入っていないが、役目は終わっている**（下記。合流してはいけない枝） |
+| `chore/akari-daily-gap-verify` | `fe11e22` | 入っている（2026-09-18 合流） |
+| `chore/akari-pages-merge-followup` | `1b98675` | 入っている（2026-09-18、`chore/akari-branch-audit` 経由） |
+| `chore/akari-branch-audit` | `e5a936c` | 入っている（2026-09-18 合流。この表自身が載っていた枝） |
+| `chore/akari-puzzlink-upstream-vector` | `f76f6f2` | 入っている（2026-09-18 合流） |
 
 `chore/akari-solver-recheck` が役目を終えたと言えるのは、次の2点を実際に
 確かめたから（「同じ題の双子だから」という見立てではない）:
@@ -47,21 +48,15 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
   この枝にあって master に無い行は「UI はまだありません」のような公開前の
   古い記述だけで、拾うべき中身は残っていない
 
-**残っている生きた枝は次の2系統で、これは直列ではなく並列**。どちらも
-`ee17e9d`（master の先端）から生えているので、**片方を合流しても、もう片方は
-入らない**。片方だけ入れて済ませないこと。
+**2026-09-18 に、生きていた枝は全部 master へ合流して push 済み**（`chore/akari-daily-gap-verify`
+→ `chore/akari-branch-audit`（`chore/akari-pages-merge-followup` を含む）→
+`chore/akari-puzzlink-upstream-vector` の順に `--no-ff`）。どれも `ee17e9d` から
+並列に生えていたが、触っている節が違うので衝突は起きなかった。合流後に
+`npm run verify`（274件 OK）と `npm run soak`（1095問・失敗0）で実測している。
 
-| 合流するならここ | 中に入るもの |
-|---|---|
-| `chore/akari-branch-audit` の**先端** | `1b98675`（`puzzlink.js` の抜けの修正）＋この枝の確認結果 |
-| `chore/akari-puzzlink-upstream-vector` (`f76f6f2`) | 符号化を上流の問題で裏づけた `verify` の F6 |
-
-`chore/akari-pages-merge-followup` を直接指す必要は無い（`chore/akari-branch-audit`
-がその上に載っているので、こちらを合流すれば一緒に入る）。
-
-幸い中身は衝突しない（`git merge-tree --write-tree 1b98675 f76f6f2` が
-衝突なしで完了する。同じ `docs/DEPLOY.md` `docs/FEATURES.md` を触っているが
-別の節）。合流するなら順番はどちらからでもよい。
+未合流のまま残るのは `chore/akari-solver-recheck` だけで、これは**合流して
+はいけない枝**（中身は `5535133` として既に master に入っており、合流すると
+公開前の古い記述が戻る）。
 
 公開直後に実測した配信（すべて 200、MIME も正しい）:
 
