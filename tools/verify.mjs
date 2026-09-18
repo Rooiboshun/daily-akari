@@ -306,6 +306,81 @@ console.log('F. puzz.link の URL との往復');
     check(`${name} の今日の問題が往復する`, render(link.puzzle) === render(made.puzzle));
     check(`${name} の往復後も解が一意`, solve(buildIndex(link.puzzle), 2).count === 1);
   }
+
+  // F6. 上流が自分で書いた問題との照合。
+  //
+  //   ここまでの F1〜F5 は「自分で組み立てた符号を自分で読み直す」往復なので、
+  //   規則そのものを取り違えていた場合は往復しても気づけない。
+  //   そこで pzprjs（puzz.link が動かしている実装）の test/script/lightup.js が
+  //   持っている問題を1つ、URL と「エラー無し」の盤面ごと引き写して突き合わせる。
+  //   引き写したのは下の2つの定数だけで、向こうのコードは持ち込んでいない。
+  //
+  //   これが通るということは、
+  //     (a) 本文の符号化の規則が上流と同じ（同じ URL から同じ数字配置が出る）
+  //     (b) 書き戻した本文が上流の文字列と1文字も違わない
+  //     (c) 解も上流が正解として持っている盤面と一致する
+  //   の3つが同時に言えるので、目視確認に頼らず相互運用を裏づけできる。
+  const UPSTREAM_URL = 'lightup/6/6/nekcakbl';
+  // 上流の盤面表記。数字は黒マスの数字、'#' は照明、'+' は「置かない」印。
+  const UPSTREAM_ANSWER = [
+    '. . # . . .',
+    '. # 4 # . .',
+    '. . # . 2 #',
+    '+ 0 . . # .',
+    '# + . 1 . .',
+    '. . . # . .',
+  ];
+
+  const up = fromUrl(UPSTREAM_URL);
+  check('上流の URL が 6x6 として読める', up.w === 6 && up.h === 6, `${up.w}x${up.h}`);
+
+  // 上流の盤面表記から数字つき黒マスだけを取り出す（'#' と '+' は答えの側）
+  const wantHints = [];
+  UPSTREAM_ANSWER.forEach((row, y) => {
+    row.split(' ').forEach((t, x) => {
+      if (/^[0-4]$/.test(t)) wantHints.push(`${x},${y}=${t}`);
+    });
+  });
+  const gotHints = [];
+  for (let y = 0; y < up.h; y++) {
+    for (let x = 0; x < up.w; x++) {
+      const hint = hintOf(up.puzzle.cells[y * up.w + x]);
+      if (hint !== null) gotHints.push(`${x},${y}=${hint}`);
+    }
+  }
+  check(
+    '上流の URL から出る数字の位置と値が一致',
+    gotHints.join(' ') === wantHints.join(' '),
+    `期待 ${wantHints.join(' ')}\n実際 ${gotHints.join(' ')}`,
+  );
+
+  // 書き戻した本文が上流の文字列と完全に一致すること（符号化側の裏づけ）
+  check(
+    '書き戻した本文が上流の文字列と一致',
+    encodeBody(up.puzzle) === 'nekcakbl',
+    `実際 ${encodeBody(up.puzzle)}`,
+  );
+
+  // 解が上流の持っている正解と一致すること
+  const upSolved = solve(buildIndex(up.puzzle), 3);
+  check('上流の問題の解が一意', upSolved.count === 1, `解 ${upSolved.count} 個`);
+  const wantLamps = [];
+  UPSTREAM_ANSWER.forEach((row, y) => {
+    row.split(' ').forEach((t, x) => {
+      if (t === '#') wantLamps.push(y * 6 + x);
+    });
+  });
+  const gotLamps = [];
+  if (upSolved.solutions[0]) {
+    upSolved.solutions[0].forEach((v, i) => {
+      if (v === LAMP) gotLamps.push(i);
+    });
+  }
+  check(
+    '解の照明の位置が上流の正解と一致',
+    wantLamps.join(',') === gotLamps.join(','),
+    `期待 ${wantLamps.join(',')}\n実際 ${gotLamps.join(',')}`,
+  );
 }
 
 // ------------------------------------------------------- G. 探索の打ち切り
