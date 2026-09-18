@@ -266,6 +266,10 @@ hard 平均 13.1ms、最悪は 0.1〜0.2 秒台（機械と負荷で 2 倍ほど
 確かめてあること（相対パスのみ・localStorage の接頭辞・外部通信なし・
 `.nojekyll` 不要）と手順は `docs/DEPLOY.md`。
 
+公開に要るのは `index.html` と `src/` の4ファイル（`akari.js` `puzzlink.js`
+`ui.js` `style.css`）の計5つ。`puzzlink.js` は画面から見えにくいが `ui.js` が
+import しているので、**1つでも欠けると盤面ごと描かれない**。
+
 ## まだ無いもの
 
 - 本物の puzz.link での目視確認（上の「まだ手で確かめていないこと」）
