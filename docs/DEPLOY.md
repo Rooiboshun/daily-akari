@@ -71,6 +71,15 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 `.js` が `application/javascript` で返ることは確認しておく価値がある。ES
 モジュールは MIME が違うとブラウザが読み込みを拒む。
 
+2026-09-21 のオフライン対応で増えたぶんも、公開後に同じく実測した（すべて 200）:
+
+| パス | 種別 |
+|---|---|
+| `/sw.js` | `application/javascript` |
+| `/manifest.webmanifest` | `application/manifest+json` |
+| `/src/pwa.js` | `application/javascript` |
+| `/icons/*.png`（4枚） | `image/png` |
+
 ---
 
 ## 公開に必要なファイル
@@ -115,9 +124,9 @@ icons/apple-touch-icon.png
   GitHub Pages は https なので問題ない。`file://` で開いた場合はオフライン対応が
   丸ごと黙って無効になる（パズル自体は今までどおり動く）
 - **`.webmanifest` の MIME** — GitHub Pages は `application/manifest+json` で
-  返す。念のため公開後に `curl -sI .../manifest.webmanifest` で確かめること。
-  もし `application/octet-stream` で返るようなら `manifest.json` に改名して
-  `index.html` の `rel="manifest"` を直す（機能は変わらない）
+  返す（2026-09-21 に公開後 `curl -sI` で実測）。もし将来 `application/octet-stream`
+  で返るようになったら `manifest.json` に改名して `index.html` の
+  `rel="manifest"` を直す（機能は変わらない）
 - **キャッシュの版** — 公開するファイルを増減したら `sw.js` の `ASSETS` と
   `VERSION` の両方を直す。`VERSION` を上げ忘れると古い一覧のまま配られる
 
