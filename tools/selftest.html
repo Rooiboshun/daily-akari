@@ -25,6 +25,11 @@
       const $ = (id) => document.getElementById(id);
       const click = (node, type = 'click') =>
         node.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
+      // class が付いているかではなく、**実際に見えているか**で判定する。
+      // 隠したつもりで見えたままだった事故があるので、ここは computed style を見る。
+      const shown = (node) => getComputedStyle(node).display !== 'none';
+      const allHiddenAreHidden = () =>
+        [...document.querySelectorAll('.hidden')].filter((n) => shown(n)).map((n) => n.id || n.className);
 
       const DATE = '2026-09-01';
       const LEVEL = 'easy';
@@ -63,6 +68,7 @@
           `${$('board').querySelectorAll('.cell.white').length} / ${whites}`,
         );
         check('「作っています」が消えている', $('busy').classList.contains('hidden'));
+        check('隠すはずの部品が見えていない', allHiddenAreHidden().length === 0, allHiddenAreHidden().join(' '));
         check(
           '手つかずの盤面を間違い扱いしない',
           $('state').textContent.startsWith('未点灯') && !$('state').classList.contains('ng'),
@@ -209,7 +215,7 @@
         click($('archive-open'));
         await settle(2);
         const arc = $('archive');
-        check('過去問ボタンで一覧が開く', !arc.classList.contains('hidden'));
+        check('過去問ボタンで一覧が開く', shown(arc));
         check('開いた月が今遊んでいる日の月', arc.querySelector('.archive-month').textContent === '2026年9月', arc.querySelector('.archive-month').textContent);
         check('曜日の見出しが7つ', arc.querySelectorAll('.archive-week span').length === 7);
         const days = arc.querySelectorAll('.archive-day[data-date]');
@@ -238,7 +244,7 @@
         // 閉じるボタンで閉じる
         click(arc.querySelector('.archive-close'));
         await settle(1);
-        check('閉じるで一覧が消える', arc.classList.contains('hidden'));
+        check('閉じるで一覧が消える', !shown(arc), getComputedStyle(arc).display);
 
         // 18. 一覧から日を選ぶと、その日の問題が開く
         click($('archive-open'));
@@ -246,7 +252,7 @@
         click(dayCell('2026-09-03'));
         await settle(10);
         check('選んだ日が開く', location.hash === '#2026-09-03/easy', location.hash);
-        check('選んだら一覧が閉じる', arc.classList.contains('hidden'));
+        check('選んだら一覧が閉じる', !shown(arc), getComputedStyle(arc).display);
         check('選んだ日の盤面が出ている', $('board').querySelectorAll('.cell').length === 49, `${$('board').querySelectorAll('.cell').length} マス`);
 
         // 19. 「まだ解いていない日へ」は今日から過去へ探す
@@ -257,6 +263,7 @@
         click(arc.querySelector('.archive-foot .btn'));
         await settle(10);
         check('未着手の日へ飛べる', location.hash === `#${akari.todayString()}/normal`, location.hash);
+        check('最後まで、隠すはずの部品が見えていない', allHiddenAreHidden().length === 0, allHiddenAreHidden().join(' '));
 
         finish(null);
       } catch (err) {
