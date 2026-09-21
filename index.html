@@ -6,6 +6,13 @@
     <title>Daily Akari — 日替わり美術館</title>
     <meta name="description" content="毎日おなじ問題が出る美術館(Akari)パズル。問題はブラウザの中で作られます。" />
     <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#16171b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="美術館" />
     <link rel="stylesheet" href="src/style.css" />
   </head>
   <body>
@@ -82,9 +89,11 @@
 
     <footer class="foot">
       <span id="seedline"></span>
+      <span id="offline" class="offline" hidden></span>
       <a href="https://dailyakari.com/" target="_blank" rel="noreferrer noopener">元ネタ: Daily Akari</a>
     </footer>
 
     <script type="module" src="src/ui.js"></script>
+    <script type="module" src="src/pwa.js"></script>
   </body>
 </html>

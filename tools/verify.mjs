@@ -11,6 +11,7 @@
  *   E. 同じ日付なら必ず同じ問題が出る（日替わりが決定的）
  *   F. puzz.link の URL と盤面が往復できる
  *   G. 探索の打ち切り（nodeLimit）が効く
+ *   H. オフライン（PWA）の配線が揃っている — 保存すべきファイルの取りこぼしが無いか
  */
 
 import {
@@ -30,6 +31,9 @@ import {
   hintOf,
 } from '../src/akari.js';
 import { encodeBody, decodeBody, toUrl, fromUrl } from '../src/puzzlink.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let pass = 0;
 let fail = 0;
@@ -403,6 +407,63 @@ console.log('G. 探索の打ち切り');
   // 上限が十分なら打ち切られない
   const enough = solve(buildIndex(parse('....')), 10, { nodeLimit: 100000 });
   check('上限が十分なら打ち切られない', enough.count === 4 && !enough.aborted, `実際 ${enough.count}`);
+}
+
+// ------------------------------------------------------- H. オフライン (PWA)
+
+// 落とすと「オフラインで開いたら真っ白」になるので、機械で見張る。
+// ここが守るのは「sw.js が保存するファイルの一覧が、実際に読むファイルと一致する」こと。
+{
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+
+  const sw = read('sw.js');
+  const html = read('index.html');
+  const manifest = JSON.parse(read('manifest.webmanifest'));
+
+  const assets = (sw.match(/const ASSETS = \[([\s\S]*?)\]/) || [, ''])[1]
+    .split(',')
+    .map((s) => (s.match(/'([^']+)'/) || [, ''])[1])
+    .filter(Boolean);
+
+  check('sw.js が保存する一覧を読み取れる', assets.length > 0, `${assets.length} 件`);
+
+  const missing = assets.filter((a) => a !== './' && !fs.existsSync(path.join(ROOT, a)));
+  check('保存する一覧のファイルが全部ある', missing.length === 0, missing.join(' '));
+
+  // index.html が読むもの・pwa.js/ui.js が import するものが一覧に入っているか。
+  const referenced = new Set();
+  for (const m of html.matchAll(/(?:src|href)="((?!https?:|data:|#)[^"]+)"/g)) referenced.add('./' + m[1]);
+  for (const f of ['src/ui.js', 'src/pwa.js']) {
+    for (const m of read(f).matchAll(/from '\.\/([^']+)'/g)) referenced.add('./src/' + m[1]);
+  }
+  for (const i of manifest.icons) referenced.add('./' + i.src);
+
+  const notCached = [...referenced].filter((r) => !assets.includes(r));
+  check('読み込むファイルが全部 sw.js の一覧に入っている', notCached.length === 0, notCached.join(' '));
+
+  check('index.html が manifest を参照している', /rel="manifest" href="manifest.webmanifest"/.test(html));
+  check('index.html が pwa.js を読んでいる', /src="src\/pwa\.js"/.test(html));
+
+  // サブパス (/daily-akari/) に置いても壊れないこと。絶対パスが1つでもあると
+  // root からしか動かなくなる。
+  const absolute = [
+    ...assets.filter((a) => a.startsWith('/')),
+    manifest.start_url,
+    manifest.scope,
+    ...manifest.icons.map((i) => i.src),
+  ].filter((v) => String(v).startsWith('/'));
+  check('オフライン周りに絶対パスが無い（サブパスでも動く）', absolute.length === 0, absolute.join(' '));
+
+  check(
+    'manifest に 192 と 512 の両方がある',
+    manifest.icons.some((i) => i.sizes === '192x192') && manifest.icons.some((i) => i.sizes === '512x512')
+  );
+  check(
+    'maskable のアイコンがある（Android のホーム画面で角が欠けない）',
+    manifest.icons.some((i) => i.purpose === 'maskable')
+  );
+  check('ホーム画面から単体で開く指定になっている', manifest.display === 'standalone', manifest.display);
 }
 
 // ---------------------------------------------------------------- まとめ
