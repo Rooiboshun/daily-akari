@@ -21,7 +21,7 @@
  * H 章が、ASSETS に並んだファイルが実在するかを検査している）。
  */
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `akari-${VERSION}`;
 
 // 相対パスは「この sw.js の置き場所」から解決される。
