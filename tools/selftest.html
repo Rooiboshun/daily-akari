@@ -203,6 +203,61 @@
         await settle(10);
         check('今日に戻れる', location.hash === `#${akari.todayString()}/${LEVEL}`, location.hash);
 
+        // 17. 過去問一覧（アーカイブ）
+        location.hash = `#${DATE}/${LEVEL}`;
+        await settle(8);
+        click($('archive-open'));
+        await settle(2);
+        const arc = $('archive');
+        check('過去問ボタンで一覧が開く', !arc.classList.contains('hidden'));
+        check('開いた月が今遊んでいる日の月', arc.querySelector('.archive-month').textContent === '2026年9月', arc.querySelector('.archive-month').textContent);
+        check('曜日の見出しが7つ', arc.querySelectorAll('.archive-week span').length === 7);
+        const days = arc.querySelectorAll('.archive-day[data-date]');
+        check('その月の日数ぶんのマスが並ぶ', days.length === 30, `${days.length} 個`);
+
+        const dayCell = (d) => arc.querySelector(`.archive-day[data-date="${d}"]`);
+        check('クリア済みの日に印が付く', dayCell(DATE).classList.contains('done'), dayCell(DATE).className);
+        check('クリアの印は ✓', dayCell(DATE).querySelector('.archive-mark').textContent === '✓');
+        check('手つかずの日には印が無い', dayCell('2026-09-02').querySelector('.archive-mark').textContent === '');
+        check(
+          '今日より後の日は押せない',
+          [...days].every((b) => b.dataset.date <= akari.todayString() || b.disabled),
+        );
+        check('集計が出る', /クリア \d+ \/ \d+日/.test(arc.querySelector('.archive-sum').textContent), arc.querySelector('.archive-sum').textContent);
+
+        // 一覧は記録を読むだけで、問題を作らない（盤面はさっきのまま）
+        check('一覧を開いても盤面は変わらない', location.hash === `#${DATE}/${LEVEL}`, location.hash);
+
+        // 難易度を切り替えると、その難易度の記録に変わる
+        const normalChip = [...arc.querySelectorAll('.archive-levels .chip')].find((b) => b.textContent.startsWith('ふつう'));
+        click(normalChip);
+        await settle(1);
+        check('一覧の難易度を切り替えられる', normalChip.classList.contains('on'));
+        check('別の難易度ではクリア印が消える', !dayCell(DATE).classList.contains('done'), dayCell(DATE).className);
+
+        // 閉じるボタンで閉じる
+        click(arc.querySelector('.archive-close'));
+        await settle(1);
+        check('閉じるで一覧が消える', arc.classList.contains('hidden'));
+
+        // 18. 一覧から日を選ぶと、その日の問題が開く
+        click($('archive-open'));
+        await settle(2);
+        click(dayCell('2026-09-03'));
+        await settle(10);
+        check('選んだ日が開く', location.hash === '#2026-09-03/easy', location.hash);
+        check('選んだら一覧が閉じる', arc.classList.contains('hidden'));
+        check('選んだ日の盤面が出ている', $('board').querySelectorAll('.cell').length === 49, `${$('board').querySelectorAll('.cell').length} マス`);
+
+        // 19. 「まだ解いていない日へ」は今日から過去へ探す
+        click($('archive-open'));
+        await settle(2);
+        click([...arc.querySelectorAll('.archive-levels .chip')].find((b) => b.textContent.startsWith('ふつう')));
+        await settle(1);
+        click(arc.querySelector('.archive-foot .btn'));
+        await settle(10);
+        check('未着手の日へ飛べる', location.hash === `#${akari.todayString()}/normal`, location.hash);
+
         finish(null);
       } catch (err) {
         finish(`${err && err.message}\n${err && err.stack}`);

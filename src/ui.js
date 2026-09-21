@@ -19,6 +19,7 @@ import {
   todayString,
 } from './akari.js';
 import { PID, toUrl, fromUrl } from './puzzlink.js';
+import { createArchive } from './archive.js';
 
 // EMPTY はソルバでは「照明を置かないと決めたマス」。
 // UI ではプレイヤーが自分で付ける「×」印がそれにあたる。
@@ -39,6 +40,8 @@ const el = {
   prevDay: document.getElementById('prev-day'),
   nextDay: document.getElementById('next-day'),
   today: document.getElementById('today'),
+  archive: document.getElementById('archive'),
+  archiveOpen: document.getElementById('archive-open'),
   lamps: document.getElementById('lamps'),
   timer: document.getElementById('timer'),
   state: document.getElementById('state'),
@@ -760,6 +763,30 @@ if (el.linkCopy) {
       }
       setLinkMsg('コピーできなかったので、上の欄に入れました', 'warn');
     }
+  });
+}
+
+// ---------------------------------------------------------------- 過去問
+
+/**
+ * 過去問一覧。記録（localStorage）だけを読んで月のマスを描き、
+ * 選ばれた日をここで読み込む。問題を作るのは選ばれた後だけ。
+ */
+const archive = el.archive
+  ? createArchive({
+      root: el.archive,
+      storePrefix: STORE_PREFIX,
+      levels: Object.keys(DIFFICULTIES),
+      levelLabel: LEVEL_LABEL,
+      onPick: (date, difficulty) => load(date, difficulty),
+    })
+  : null;
+
+if (el.archiveOpen && archive) {
+  el.archiveOpen.addEventListener('click', () => {
+    if (archive.isOpen()) archive.hide();
+    // 読み込んだ問題を遊んでいるときは date が null なので、今日の月から開く
+    else archive.show(game && game.date ? game.date : TODAY, game && game.difficulty ? game.difficulty : lastDifficulty);
   });
 }
 

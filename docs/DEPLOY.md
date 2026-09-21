@@ -4,7 +4,7 @@
 CI も無いので、公開に必要なのは **どこへ置くかを決めること** だけ。
 判断材料と手順をここにまとめる。
 
-最終更新: 2026-09-21（**公開済み**。案 A を採った。オフライン対応を追加）
+最終更新: 2026-09-21（**公開済み**。案 A を採った。オフライン対応と過去問一覧を追加）
 
 ## 今どうなっているか
 
@@ -84,7 +84,7 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 
 ## 公開に必要なファイル
 
-公開に要るのは次の 12 個。
+公開に要るのは次の 13 個。
 
 ```
 index.html
@@ -93,6 +93,7 @@ manifest.webmanifest
 src/akari.js
 src/puzzlink.js
 src/ui.js
+src/archive.js
 src/pwa.js
 src/style.css
 icons/icon-192.png
@@ -162,8 +163,8 @@ Source を `master` / `/ (root)` にする。URL は
 - **サブパスでも壊れない** — `index.html` の参照は `src/style.css` と
   `src/ui.js`、`ui.js` の import は `./akari.js` と `./puzzlink.js` で、
   すべて相対パス。絶対パス（`/src/...`）は1つも無い。`npm run uitest` は
-  root 配信と `/daily-akari` 配信の両方で同じ32項目を回していて、
-  2026-09-18 に公開後の master で再測して 64/64 通過（`npm run serve -- 8123 /daily-akari/` で
+  root 配信と `/daily-akari` 配信の両方で同じ49項目を回していて、
+  2026-09-21 に 98/98 通過（`npm run serve -- 8123 /daily-akari/` で
   目でも確かめられる）
 - **localStorage が他の作品とぶつからない** — `rooiboshun.github.io` は
   作品どうしで localStorage を共有する（オリジンが同じ）。保存キーは

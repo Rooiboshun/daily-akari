@@ -92,11 +92,17 @@ try {
   const first = await dumpDom(profile, url);
   check('1回目: 盤面が描かれる', cells(first) > 0, `${cells(first)} マス`);
 
-  // 保存はページを閉じた後も続くことがあるので、少し待ってから2回目。
-  await sleep(1500);
-
   // 2回目 — 保存済みの版が使われ、状態表示が「遊べます」になる。
-  const second = await dumpDom(profile, url);
+  //
+  // 保存はページを閉じた後も続くことがあり、機械の混み具合で何秒かかるか
+  // 読めない。固定の待ち時間を置くと「混んでいる日だけ落ちる」検査になるので、
+  // 表示が変わるまで開き直して待つ（最大 5 回）。
+  let second = '';
+  for (let i = 0; i < 5; i++) {
+    second = await dumpDom(profile, url);
+    if (/オフラインで遊べます|オフラインで動いています/.test(second)) break;
+    await sleep(1000);
+  }
   check('2回目: 盤面が描かれる', cells(second) > 0, `${cells(second)} マス`);
   check('2回目: オフライン保存が済んだ表示になる', /オフラインで遊べます|オフラインで動いています/.test(second));
 
