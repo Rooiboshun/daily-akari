@@ -393,6 +393,144 @@ main {
   color: #6b6d75;
 }
 
+/* 過去問一覧（src/archive.js が中身を組み立てる）。 */
+.archive {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  background: rgba(12, 13, 16, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.archive-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.archive-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.archive-month {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.archive-levels {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.archive-levels .chip {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.archive-week,
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.archive-week {
+  font-size: 11px;
+  color: var(--dim);
+  text-align: center;
+}
+
+.archive-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--black-cell);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.archive-day.blank {
+  background: none;
+  cursor: default;
+}
+
+.archive-day:disabled {
+  color: #4b4e57;
+  background: #1a1c21;
+  cursor: default;
+}
+
+.archive-day.is-today {
+  border-color: var(--accent);
+}
+
+.archive-day.done {
+  background: #24402c;
+  color: var(--ok);
+}
+
+.archive-day.partial {
+  background: #3b3524;
+  color: var(--lit-strong);
+}
+
+.archive-day.revealed {
+  color: var(--dim);
+}
+
+.archive-mark {
+  font-size: 10px;
+  line-height: 1;
+  min-height: 10px;
+}
+
+.archive-sum {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}
+
+.archive-foot {
+  display: flex;
+}
+
+.archive-foot .btn {
+  flex: 1;
+}
+
+.archive-note {
+  margin: 0;
+  font-size: 11px;
+  color: #6b6d75;
+  line-height: 1.5;
+}
+
 /* オフライン保存の状態（src/pwa.js が出し入れする）。 */
 .offline {
   display: inline-flex;

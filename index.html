@@ -23,6 +23,7 @@
         <input id="date" type="date" class="chip date" />
         <button id="next-day" class="chip" title="次の日">▶</button>
         <button id="today" class="chip">今日</button>
+        <button id="archive-open" class="chip">過去問</button>
       </nav>
       <nav class="levels" id="levels"></nav>
     </header>
@@ -86,6 +87,9 @@
         </div>
       </details>
     </main>
+
+    <!-- 過去問一覧。中身は src/archive.js が組み立てる -->
+    <div id="archive" class="archive hidden" role="dialog" aria-label="過去問一覧" aria-modal="true"></div>
 
     <footer class="foot">
       <span id="seedline"></span>
