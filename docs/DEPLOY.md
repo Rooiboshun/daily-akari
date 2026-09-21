@@ -4,7 +4,7 @@
 CI も無いので、公開に必要なのは **どこへ置くかを決めること** だけ。
 判断材料と手順をここにまとめる。
 
-最終更新: 2026-09-18（**公開済み**。案 A を採った。公開後の master で再検証済み）
+最終更新: 2026-09-21（**公開済み**。案 A を採った。オフライン対応を追加）
 
 ## 今どうなっているか
 
@@ -75,23 +75,55 @@ CI も無いので、公開に必要なのは **どこへ置くかを決める�
 
 ## 公開に必要なファイル
 
-公開に要るのは次の5つだけ。
+公開に要るのは次の 12 個。
 
 ```
 index.html
+sw.js                        ← オフライン用。必ず配信の root に置く（下記）
+manifest.webmanifest
 src/akari.js
 src/puzzlink.js
 src/ui.js
+src/pwa.js
 src/style.css
+icons/icon-192.png
+icons/icon-512.png
+icons/icon-maskable-512.png
+icons/apple-touch-icon.png
 ```
 
 `tools/` `docs/` `package.json` `README.md` は無くても動く（置いたままでも
 害は無い。GitHub Pages は単に配るだけで、`package.json` を見てビルドしたりしない）。
 
+取りこぼしは `npm run verify` の H 章が見張っている（`sw.js` の `ASSETS` と、
+実際に読み込むファイルの一致を検査する）。
+
 > `src/puzzlink.js` を**落とすと画面が真っ白になる**。`ui.js` が
 > `import { PID, toUrl, fromUrl } from './puzzlink.js'` で読んでいて、ES モジュールは
 > 1つでも解決に失敗するとモジュール全体が実行されないため、盤面すら描かれない。
 > 案 B（`rooiboshun.github.io` へコピー）を採るならここが唯一の落とし穴。
+
+## オフライン対応（PWA）で増えた前提
+
+2026-09-21 に Service Worker を入れた。**置き方の前提が1つだけ増えている。**
+
+- **`sw.js` は配信の root に置く** — Service Worker は「自分が置かれた場所より
+  下」しか面倒を見ない。`/daily-akari/sw.js` なら `/daily-akari/` 配下が範囲に
+  入るので案 A ならこのままでよいが、`sw.js` を `src/` の下などに移すと
+  `index.html` が範囲から外れて何も保存されなくなる
+- **https が要る** — Service Worker は https（と localhost）でしか動かない。
+  GitHub Pages は https なので問題ない。`file://` で開いた場合はオフライン対応が
+  丸ごと黙って無効になる（パズル自体は今までどおり動く）
+- **`.webmanifest` の MIME** — GitHub Pages は `application/manifest+json` で
+  返す。念のため公開後に `curl -sI .../manifest.webmanifest` で確かめること。
+  もし `application/octet-stream` で返るようなら `manifest.json` に改名して
+  `index.html` の `rel="manifest"` を直す（機能は変わらない）
+- **キャッシュの版** — 公開するファイルを増減したら `sw.js` の `ASSETS` と
+  `VERSION` の両方を直す。`VERSION` を上げ忘れると古い一覧のまま配られる
+
+実測は `npm run offlinetest`（root）と `npm run offlinetest -- /daily-akari`
+（本番と同じサブパス）。どちらも 8/8 通過（2026-09-21）。3回目は**サーバを
+止めてから**開いていて、それでも 81 マスの盤面が出ることを見ている。
 
 ## 置き場所は2択（採ったのは A）
 
@@ -106,7 +138,7 @@ Source を `master` / `/ (root)` にする。URL は
 
 ### B. 既存の `rooiboshun.github.io` の中に置く
 
-`rooiboshun.github.io` リポジトリに `daily-akari/` を作り、上の4ファイルを
+`rooiboshun.github.io` リポジトリに `daily-akari/` を作り、上のファイル一式を
 コピーして push する。URL は同じく
 `https://rooiboshun.github.io/daily-akari/` で、既存作と同じ並びに入る。
 
@@ -128,9 +160,10 @@ Source を `master` / `/ (root)` にする。URL は
   作品どうしで localStorage を共有する（オリジンが同じ）。保存キーは
   `akari:v1:<日付>:<難易度>`（読み込んだ問題は `akari:v1:link:<大きさ>:<本文>`）と
   接頭辞付きなので衝突しない
-- **外部への通信が無い** — 読み込むのは同じ場所の4ファイルだけ。
+- **外部への通信が無い** — 読み込むのは同じ場所のファイルだけ。
   フォント・CDN・解析の類は一切読んでいないので、https でも混在コンテンツにならず、
-  オフラインでも一度開けば動く（Service Worker は入れていないので初回は要通信）。
+  一度開けばオフラインで動く（2026-09-21 に Service Worker を入れたので、
+  初回に開いた後は通信が要らない）。
   puzz.link との行き来も**通信ではなく URL 文字列の変換**で、向こうへ実際に
   出て行くのは利用者が `今の問題を puzz.link で開く` を押したときだけ
   （`target="_blank"` + `rel="noreferrer noopener"`）

@@ -393,6 +393,35 @@ main {
   color: #6b6d75;
 }
 
+/* オフライン保存の状態（src/pwa.js が出し入れする）。 */
+.offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.offline.ok {
+  color: var(--ok);
+}
+
+.offline.warn {
+  color: var(--lit-strong);
+}
+
+.offline.ng {
+  color: var(--ng);
+}
+
+.offline-update {
+  font: inherit;
+  color: #10131a;
+  background: var(--lit-strong);
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
 @media (max-width: 430px) {
   :root {
     --cell: 34px;
