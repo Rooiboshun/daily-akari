@@ -131,6 +131,47 @@
         const given = $('board').querySelectorAll('.cell.white.given');
         check('ヒントが正解を1つ置く', given.length === 1 && given[0].classList.contains('lamp'));
 
+        // 8b. △（仮置き）: 別の色で十字を照らし、クリアには数えない
+        click($('reset'));
+        await settle(1);
+        const shiftClick = (node) =>
+          node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+        shiftClick(cellAt(pairA));
+        await settle(1);
+        check('Shift+クリックで△が付く', cellAt(pairA).classList.contains('tent') && !cellAt(pairA).classList.contains('lamp'));
+        check('△の十字は仮置きの色で照らす', cellAt(pairB).classList.contains('tlit') && !cellAt(pairB).classList.contains('lit'));
+        check('△は照明の数に入らない', $('lamps').textContent.startsWith('照明 0') && $('lamps').textContent.includes('△ 1'), $('lamps').textContent);
+        check('△があると「△を照明にする」が押せる', !$('tent-commit').disabled && !$('tent-clear').disabled);
+        click(cellAt(pairB));
+        await settle(1);
+        check('△と照明の照らし合いが赤くなる', cellAt(pairA).classList.contains('clash') && cellAt(pairB).classList.contains('clash'));
+        check('△で矛盾が状態に出る', $('state').textContent.startsWith('△で矛盾'), $('state').textContent);
+        click(cellAt(pairB));
+        await settle(1);
+
+        // 8c. 盤面の保存と呼び出し
+        check('保存前は「戻す」が押せない', $('snap-load').disabled);
+        click($('snap-save'));
+        await settle(1);
+        check('盤面を保存すると「戻す」が押せる', !$('snap-load').disabled);
+        check('保存した盤面が記録に残る', JSON.parse(localStorage.getItem(`akari:v1:${DATE}:${LEVEL}`)).snap.s.includes('3'));
+        const savedHtml = $('board').innerHTML;
+        const third = ix.whites.find((i) => i !== pairA && i !== pairB);
+        click(cellAt(pairB));
+        cellAt(third).dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true, cancelable: true }));
+        await settle(1);
+        check('t キーでも△が付く', cellAt(third).classList.contains('tent'));
+        click($('snap-load'));
+        await settle(1);
+        check('保存した盤面に戻る', $('board').innerHTML === savedHtml);
+        click($('tent-clear'));
+        await settle(1);
+        check('「△を全部消す」で△が消える', $('board').querySelectorAll('.cell.white.tent').length === 0);
+        shiftClick(cellAt(pairA));
+        click($('tent-commit'));
+        await settle(1);
+        check('「△を照明にする」で照明になる', cellAt(pairA).classList.contains('lamp') && !cellAt(pairA).classList.contains('tent'));
+
         // 9. 答えどおりに置くとクリアになる
         click($('reset'));
         await settle(1);

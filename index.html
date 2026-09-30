@@ -55,9 +55,20 @@
         <button id="reveal" class="btn danger">答えを見る</button>
       </div>
 
+      <div class="tools">
+        <button id="tent-commit" class="btn" disabled>△を照明にする</button>
+        <button id="tent-clear" class="btn" disabled>△を全部消す</button>
+        <button id="snap-save" class="btn">盤面を保存</button>
+        <button id="snap-load" class="btn" disabled>保存した盤面に戻す</button>
+      </div>
+
       <p class="howto">
         白マスをクリックで照明。右クリック（スマホは長押し、または「タップ:」ボタンの切り替え）で「置かない」印。
         照明はぶつかり合ってはいけません。数字は接する照明の本数です。
+      </p>
+      <p class="howto">
+        △は仮置き（Shift+クリック、キーの <kbd>t</kbd>、または「タップ:」を△に切り替え）。青く照らしますがクリアには数えません。
+        試す前に「盤面を保存」しておけば、行き詰まったとき一度で戻せます。
       </p>
 
       <details class="share" id="share">
