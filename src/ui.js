@@ -24,6 +24,14 @@ import { createArchive } from './archive.js';
 // EMPTY はソルバでは「照明を置かないと決めたマス」。
 // UI ではプレイヤーが自分で付ける「×」印がそれにあたる。
 const MARK = EMPTY;
+// 「仮置き」の△。ソルバには無い、UI だけの状態（game.state の外へは出さない）。
+// 照明と同じように照らすが別の色で描き、クリア判定には数えない。
+// 矛盾を探すために「ここに置いたらどうなるか」を試すためのもの。
+const TENT = 3;
+
+// タップの意味（スマホ用に切り替えられる）。ボタンを押すたびにこの順で回る
+const TAP_MODES = ['lamp', 'mark', 'tent'];
+const TAP_LABEL = { lamp: 'タップ: 照明', mark: 'タップ: ×印', tent: 'タップ: △仮置き' };
 
 const LEVEL_LABEL = {
   easy: 'やさしい 7×7',
@@ -50,6 +58,10 @@ const el = {
   check: document.getElementById('check'),
   reset: document.getElementById('reset'),
   reveal: document.getElementById('reveal'),
+  tentCommit: document.getElementById('tent-commit'),
+  tentClear: document.getElementById('tent-clear'),
+  snapSave: document.getElementById('snap-save'),
+  snapLoad: document.getElementById('snap-load'),
   overlay: document.getElementById('overlay'),
   overlayTitle: document.getElementById('overlay-title'),
   overlayBody: document.getElementById('overlay-body'),
@@ -78,8 +90,8 @@ let cellEls = [];
 let givenCells = new Set();
 /** 「まちがい探し」で赤くしたマス。次に触ったら消す */
 let wrongCells = new Set();
-/** タップの意味。false = 照明 / true = ×印（スマホ用） */
-let markMode = false;
+/** タップの意味。TAP_MODES のどれか */
+let tapMode = 'lamp';
 /** 最後に遊んだ日替わりの難易度。読み込んだ問題から日付に戻るときの行き先 */
 let lastDifficulty = 'normal';
 
@@ -138,6 +150,7 @@ function saveProgress() {
         revealed: game.revealed,
         hints: game.hintsUsed,
         given: Array.from(givenCells),
+        snap: game.snap,
       }),
     );
   } catch {
@@ -151,6 +164,7 @@ function loadProgress(id, size) {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (typeof data.s !== 'string' || data.s.length !== size) return null;
+    if (data.snap && (typeof data.snap.s !== 'string' || data.snap.s.length !== size)) data.snap = null;
     return data;
   } catch {
     return null;
@@ -198,15 +212,38 @@ document.addEventListener('visibilitychange', () => {
 
 // ------------------------------------------------------------------ 判定
 
-/** 各マスが何本の照明に照らされているかを数える。2本以上なら照らし合い。 */
+/**
+ * 各マスが何本の照明に照らされているかを数える。2本以上なら照らし合い。
+ * 仮置き（△）の光は別に数える（判定には使わず、描き分けと矛盾探しに使う）。
+ */
 function computeLit() {
   const { ix, state } = game;
   const lit = new Uint8Array(ix.w * ix.h);
+  const tent = new Uint8Array(ix.w * ix.h);
   for (const i of ix.whites) {
-    if (state[i] !== LAMP) continue;
-    for (const j of ix.beams[i]) lit[j]++;
+    const into = state[i] === LAMP ? lit : state[i] === TENT ? tent : null;
+    if (!into) continue;
+    for (const j of ix.beams[i]) into[j]++;
   }
-  return lit;
+  return { lit, tent };
+}
+
+/** 仮置き込みで見たときの矛盾（照らし合い・数字オーバー）の数。 */
+function inspectWithTent(lit, tent) {
+  const { ix, state } = game;
+  let tents = 0;
+  let clash = 0;
+  for (const i of ix.whites) {
+    if (state[i] === TENT) tents++;
+    if ((state[i] === LAMP || state[i] === TENT) && lit[i] + tent[i] > 1) clash++;
+  }
+  let overHints = 0;
+  for (const nb of ix.numbered) {
+    let n = 0;
+    for (const j of nb.adj) if (state[j] === LAMP || state[j] === TENT) n++;
+    if (n > nb.hint) overHints++;
+  }
+  return { tents, clash, overHints };
 }
 
 /** 今の盤面の出来具合。完成判定と、状況表示の材料をまとめて返す。 */
@@ -271,29 +308,40 @@ function buildBoard() {
 }
 
 function paint() {
-  const { ix, puzzle, state } = game;
-  const lit = computeLit();
+  const { ix, state } = game;
+  const { lit, tent } = computeLit();
 
   for (const i of ix.whites) {
     const node = cellEls[i];
+    const lampish = state[i] === LAMP || state[i] === TENT;
     node.classList.toggle('lamp', state[i] === LAMP);
+    node.classList.toggle('tent', state[i] === TENT);
     node.classList.toggle('mark', state[i] === MARK);
     node.classList.toggle('lit', lit[i] > 0);
-    node.classList.toggle('clash', state[i] === LAMP && lit[i] > 1);
+    // 本物の光が当たっていないマスだけ、仮置きの色で塗る
+    node.classList.toggle('tlit', lit[i] === 0 && tent[i] > 0);
+    node.classList.toggle('clash', lampish && lit[i] + tent[i] > 1);
     node.classList.toggle('given', givenCells.has(i));
     node.classList.toggle('wrong', wrongCells.has(i));
   }
 
   for (const nb of ix.numbered) {
     let n = 0;
-    for (const j of nb.adj) if (state[j] === LAMP) n++;
+    let t = 0;
+    for (const j of nb.adj) {
+      if (state[j] === LAMP) n++;
+      else if (state[j] === TENT) t++;
+    }
     const node = cellEls[nb.index];
     node.classList.toggle('sat', n === nb.hint);
-    node.classList.toggle('over', n > nb.hint);
+    // 仮置きを足すと合う数字は、仮置きの色で見せる
+    node.classList.toggle('tsat', t > 0 && n + t === nb.hint);
+    node.classList.toggle('over', n + t > nb.hint);
   }
 
   const info = inspect(lit);
-  el.lamps.textContent = `照明 ${info.lamps}`;
+  const withTent = inspectWithTent(lit, tent);
+  el.lamps.textContent = withTent.tents > 0 ? `照明 ${info.lamps} · △ ${withTent.tents}` : `照明 ${info.lamps}`;
   el.timer.textContent = formatTime(elapsedMs());
 
   el.state.classList.remove('ok', 'ng');
@@ -308,11 +356,22 @@ function paint() {
     if (info.overHints > 0) parts.push(`数字オーバー ${info.overHints}`);
     el.state.textContent = parts.join(' / ');
     el.state.classList.add('ng');
+  } else if (withTent.clash > 0 || withTent.overHints > 0) {
+    const parts = [];
+    if (withTent.clash > 0) parts.push(`照らし合い ${withTent.clash}`);
+    if (withTent.overHints > 0) parts.push(`数字オーバー ${withTent.overHints}`);
+    el.state.textContent = `△で矛盾: ${parts.join(' / ')}`;
+    el.state.classList.add('ng');
   } else {
     el.state.textContent = `未点灯 ${info.unlit}`;
   }
 
   el.board.classList.toggle('done', game.done || game.revealed);
+  const playing = !game.done && !game.revealed;
+  if (el.tentCommit) el.tentCommit.disabled = !playing || withTent.tents === 0;
+  if (el.tentClear) el.tentClear.disabled = !playing || withTent.tents === 0;
+  if (el.snapSave) el.snapSave.disabled = !playing;
+  if (el.snapLoad) el.snapLoad.disabled = !playing || !game.snap;
   el.seedline.textContent = `${game.label} · ヒント ${game.hintsUsed}`;
 
   return info;
@@ -356,6 +415,17 @@ function toggleMark(i) {
   setCell(i, game.state[i] === MARK ? UNKNOWN : MARK);
 }
 
+function toggleTent(i) {
+  setCell(i, game.state[i] === TENT ? UNKNOWN : TENT);
+}
+
+/** タップ（クリック）1回ぶん。今のタップの意味に従う */
+function tap(i) {
+  if (tapMode === 'mark') toggleMark(i);
+  else if (tapMode === 'tent') toggleTent(i);
+  else toggleLamp(i);
+}
+
 // 長押しで印を付けた直後の click は捨てる（同じ操作で2回反応しないように）
 let swallowClick = false;
 
@@ -368,8 +438,9 @@ el.board.addEventListener('click', (ev) => {
     return;
   }
   const i = Number(node.dataset.i);
-  if (markMode) toggleMark(i);
-  else toggleLamp(i);
+  // Shift+クリックは、今のタップの意味にかかわらず△
+  if (ev.shiftKey) toggleTent(i);
+  else tap(i);
 });
 
 // 右クリックは「×」印。メニューは出さない
@@ -390,7 +461,8 @@ el.board.addEventListener('pointerdown', (ev) => {
   pressTimer = setTimeout(() => {
     pressTimer = null;
     swallowClick = true;
-    if (markMode) toggleLamp(i);
+    // 長押しは「×」印。タップが×印のときだけ照明にする
+    if (tapMode === 'mark') toggleLamp(i);
     else toggleMark(i);
   }, 450);
 });
@@ -403,7 +475,7 @@ for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
   });
 }
 
-// キーボード: 矢印で移動、x で「×」印
+// キーボード: 矢印で移動、x で「×」印、t で△
 el.board.addEventListener('keydown', (ev) => {
   const node = ev.target.closest('.cell.white');
   if (!node) return;
@@ -411,6 +483,11 @@ el.board.addEventListener('keydown', (ev) => {
   if (ev.key === 'x' || ev.key === 'X') {
     ev.preventDefault();
     toggleMark(i);
+    return;
+  }
+  if (ev.key === 't' || ev.key === 'T') {
+    ev.preventDefault();
+    toggleTent(i);
     return;
   }
   const step = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[ev.key];
@@ -434,10 +511,56 @@ el.board.addEventListener('keydown', (ev) => {
 // ------------------------------------------------------------------ 道具
 
 el.mode.addEventListener('click', () => {
-  markMode = !markMode;
-  el.mode.textContent = markMode ? 'タップ: ×印' : 'タップ: 照明';
-  el.mode.setAttribute('aria-pressed', String(markMode));
+  tapMode = TAP_MODES[(TAP_MODES.indexOf(tapMode) + 1) % TAP_MODES.length];
+  el.mode.textContent = TAP_LABEL[tapMode];
+  el.mode.dataset.mode = tapMode;
+  el.mode.setAttribute('aria-pressed', String(tapMode !== 'lamp'));
 });
+
+/** 盤面の△を全部 next に変える（確定なら照明、消すなら空白） */
+function replaceTents(next) {
+  if (!game || game.done || game.revealed) return;
+  let changed = false;
+  for (const i of game.ix.whites) {
+    if (game.state[i] === TENT) {
+      game.state[i] = next;
+      changed = true;
+    }
+  }
+  if (changed) afterEdit();
+}
+
+if (el.tentCommit) el.tentCommit.addEventListener('click', () => replaceTents(LAMP));
+if (el.tentClear) el.tentClear.addEventListener('click', () => replaceTents(UNKNOWN));
+
+function sayOk(text) {
+  el.state.textContent = text;
+  el.state.classList.remove('ng');
+  el.state.classList.add('ok');
+}
+
+// 盤面の保存と呼び出し。問題ごとに1枠で、途中経過と一緒に localStorage に残る。
+// 仮置きで試して行き詰まったとき、置く前の盤面へ一度で戻るためのもの。
+if (el.snapSave) {
+  el.snapSave.addEventListener('click', () => {
+    if (!game || game.done || game.revealed) return;
+    game.snap = { s: Array.from(game.state).join(''), given: Array.from(givenCells) };
+    saveProgress();
+    paint();
+    sayOk('盤面を保存しました');
+  });
+}
+
+if (el.snapLoad) {
+  el.snapLoad.addEventListener('click', () => {
+    if (!game || game.done || game.revealed || !game.snap) return;
+    const { s, given } = game.snap;
+    for (let i = 0; i < s.length; i++) game.state[i] = Number(s[i]) || 0;
+    givenCells = new Set(Array.isArray(given) ? given : []);
+    afterEdit();
+    if (!game.done) sayOk('保存した盤面に戻しました');
+  });
+}
 
 el.reset.addEventListener('click', () => {
   if (!game) return;
@@ -448,6 +571,7 @@ el.reset.addEventListener('click', () => {
   game.accumMs = 0;
   game.runningSince = null;
   game.touched = false;
+  game.snap = null;
   givenCells.clear();
   wrongCells.clear();
   el.overlay.classList.add('hidden');
@@ -573,6 +697,8 @@ function install(made, meta) {
     done: false,
     revealed: false,
     hintsUsed: 0,
+    // 「盤面を保存」で取っておいた盤面 { s, given }。問題ごとに1枠
+    snap: null,
   };
   givenCells = new Set();
   wrongCells = new Set();
@@ -586,6 +712,7 @@ function install(made, meta) {
     game.hintsUsed = Number(saved.hints) || 0;
     game.touched = game.accumMs > 0;
     if (Array.isArray(saved.given)) givenCells = new Set(saved.given);
+    if (saved.snap) game.snap = saved.snap;
   }
 
   buildBoard();

@@ -10,6 +10,9 @@
   --white-ink: #2a2b30;
   --lit: #ffe9a8;
   --lit-strong: #ffd870;
+  --tent-lit: #cfe3ff;
+  --tent-strong: #9cc4ff;
+  --tent-ink: #1d4f9c;
   --black-cell: #2a2c33;
   --accent: #7fb2ff;
   --ok: #6ed08a;
@@ -190,6 +193,35 @@ main {
 .cell.white.clash::after {
   background: radial-gradient(circle at 35% 30%, #fff0f0, #ff5a5a 70%, #c22);
   box-shadow: 0 0 10px rgba(255, 90, 90, 0.8);
+}
+
+/* 仮置き（△）。照明とは別の色で、照らす十字も同じ系統の色で塗る */
+.cell.white.tlit {
+  background: var(--tent-lit);
+}
+
+.cell.white.tent {
+  background: var(--tent-strong);
+}
+
+.cell.white.tent::after {
+  content: "△";
+  color: var(--tent-ink);
+  font-size: calc(var(--cell) * 0.5);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cell.white.tent.clash {
+  background: #ffb2b2;
+}
+
+.cell.white.tent.clash::after {
+  color: #c22;
+}
+
+.cell.black.tsat {
+  color: var(--tent-strong);
 }
 
 .cell.white.mark::after {
