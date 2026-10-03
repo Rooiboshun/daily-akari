@@ -11,6 +11,10 @@
  *
  * 保存の形は ui.js と共有している（`akari:v1:<日付>:<難易度>`）。
  * 鍵の前置きは設定で受け取るので、この file は保存の場所を知らない。
+ *
+ * 「未クリアだけ」の絞り込みも覚えておく（`akari:v1:archive:unsolved-only`）。
+ * 順番に潰していく遊び方だと、開くたびに押し直すのでは意味がないため。
+ * 日付の鍵は必ず `YYYY-MM-DD:<難易度>` の形なので、この鍵とはぶつからない。
  */
 
 import { todayString } from './akari.js';
@@ -22,6 +26,12 @@ const STATUS = {
   partial: { mark: '…', label: '途中' },
   none: { mark: '', label: '未着手' },
 };
+
+/** 「未クリアだけ」の記憶に使う鍵（前置きのうしろに付く）。 */
+const UNSOLVED_KEY = 'archive:unsolved-only';
+
+/** クリア済みかどうか。「未クリア」は done 以外すべて（途中・答えを見た・未着手）。 */
+const isCleared = (st) => st === 'done';
 
 const pad = (n) => String(n).padStart(2, '0');
 const monthOf = (dateStr) => dateStr.slice(0, 7);
@@ -62,6 +72,25 @@ export function createArchive(config) {
   let month = monthOf(today);
   let level = levels[0];
   let open = false;
+  let unsolvedOnly = readUnsolvedOnly();
+
+  // --- 絞り込みの記憶（読めない・書けない環境でも黙って続ける）
+
+  function readUnsolvedOnly() {
+    try {
+      return localStorage.getItem(`${storePrefix}${UNSOLVED_KEY}`) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function writeUnsolvedOnly() {
+    try {
+      localStorage.setItem(`${storePrefix}${UNSOLVED_KEY}`, unsolvedOnly ? '1' : '0');
+    } catch {
+      /* プライベートモードなど。絞り込みはその場だけ効く */
+    }
+  }
 
   // --- 入れ物を組み立てる（index.html には空の器だけ置いてある）
 
@@ -91,6 +120,18 @@ export function createArchive(config) {
     levelRow.appendChild(b);
   }
 
+  // 「未クリアだけ」の絞り込み。クリアした日は印ごと伏せて、残りだけが見える。
+  const filterRow = document.createElement('div');
+  filterRow.className = 'archive-filter';
+  const unsolvedBtn = chip('未クリアだけ', 'クリアした日を伏せる');
+  unsolvedBtn.classList.add('archive-unsolved');
+  unsolvedBtn.addEventListener('click', () => {
+    unsolvedOnly = !unsolvedOnly;
+    writeUnsolvedOnly();
+    render();
+  });
+  filterRow.append(unsolvedBtn);
+
   const head = document.createElement('div');
   head.className = 'archive-week';
   for (const w of ['日', '月', '火', '水', '木', '金', '土']) {
@@ -107,7 +148,7 @@ export function createArchive(config) {
 
   const findBtn = document.createElement('button');
   findBtn.type = 'button';
-  findBtn.className = 'btn';
+  findBtn.className = 'btn archive-find';
   findBtn.textContent = 'まだ解いていない日へ';
 
   const note = document.createElement('p');
@@ -119,7 +160,7 @@ export function createArchive(config) {
   foot.className = 'archive-foot';
   foot.append(findBtn);
 
-  card.append(top, levelRow, head, grid, sum, foot, note);
+  card.append(top, levelRow, filterRow, head, grid, sum, foot, note);
   root.appendChild(card);
 
   function chip(text, title2 = '') {
@@ -160,6 +201,11 @@ export function createArchive(config) {
     next.disabled = month >= monthOf(today);
     for (const [key, b] of levelButtons) b.classList.toggle('on', key === level);
 
+    unsolvedBtn.classList.toggle('on', unsolvedOnly);
+    unsolvedBtn.setAttribute('aria-pressed', unsolvedOnly ? 'true' : 'false');
+    // 絞り込み中は「クリアしていない日」＝途中の日も行き先に含める。
+    findBtn.textContent = unsolvedOnly ? '未クリアの日へ' : 'まだ解いていない日へ';
+
     grid.replaceChildren();
     for (let i = 0; i < firstWeekday(month); i++) {
       const blank = document.createElement('span');
@@ -177,10 +223,14 @@ export function createArchive(config) {
       if (!future) playable++;
       if (st === 'done') done++;
 
+      // 絞り込み中のクリア済みの日は、マスの枠だけ残して伏せる。
+      // 消してしまうと曜日の列がずれて、カレンダーとして読めなくなるため。
+      const away = unsolvedOnly && isCleared(st);
+
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `archive-day ${st}`;
-      b.disabled = future;
+      b.className = away ? 'archive-day filtered' : `archive-day ${st}`;
+      b.disabled = future || away;
       b.dataset.date = date;
       if (date === today) b.classList.add('is-today');
 
@@ -189,15 +239,26 @@ export function createArchive(config) {
       num.textContent = String(d);
       const mark = document.createElement('span');
       mark.className = 'archive-mark';
-      mark.textContent = STATUS[st].mark;
+      mark.textContent = away ? '' : STATUS[st].mark;
       b.append(num, mark);
-      b.setAttribute('aria-label', `${m}月${d}日 ${levelLabel[level] || level} ${STATUS[st].label}`);
+      b.setAttribute(
+        'aria-label',
+        away
+          ? `${m}月${d}日 クリア済み（絞り込みで伏せています）`
+          : `${m}月${d}日 ${levelLabel[level] || level} ${STATUS[st].label}`,
+      );
 
-      if (!future) b.addEventListener('click', () => pick(date));
+      if (!future && !away) b.addEventListener('click', () => pick(date));
       grid.appendChild(b);
     }
 
-    sum.textContent = `この月: クリア ${done} / ${playable}日`;
+    if (!unsolvedOnly) {
+      sum.textContent = `この月: クリア ${done} / ${playable}日`;
+    } else if (playable - done === 0) {
+      sum.textContent = `この月は ${playable}日ぜんぶクリア済みです`;
+    } else {
+      sum.textContent = `この月: 未クリア ${playable - done}日（クリア ${done}日は伏せています）`;
+    }
   }
 
   function pick(date) {
@@ -206,15 +267,20 @@ export function createArchive(config) {
   }
 
   /**
-   * まだ手を付けていない日を、今日から過去へ向かって探す。
+   * 行き先の日を、今日から過去へ向かって探す。
    * 見つからないまま 2 年ぶん遡ったら諦める（全部やっている人向けの保険）。
+   *
+   * 探す相手は絞り込みに合わせる。普段は「まだ手を付けていない日」だが、
+   * 「未クリアだけ」を立てているときは途中でやめた日・答えを見た日も行き先に
+   * 含める（順番に潰していく遊び方では、やり残しこそ戻りたい先なので）。
    */
   function findUnplayed() {
+    const wanted = (st) => (unsolvedOnly ? !isCleared(st) : st === 'none');
     const [y, m, d] = today.split('-').map(Number);
     for (let i = 0; i < 730; i++) {
       const dt = new Date(y, m - 1, d - i);
       const date = todayString(dt);
-      if (statusOf(date, level) === 'none') return date;
+      if (wanted(statusOf(date, level))) return date;
     }
     return null;
   }
@@ -222,7 +288,9 @@ export function createArchive(config) {
   findBtn.addEventListener('click', () => {
     const date = findUnplayed();
     if (!date) {
-      sum.textContent = 'この難易度は2年ぶん全部に手が付いています。';
+      sum.textContent = unsolvedOnly
+        ? 'この難易度は2年ぶん全部クリア済みです。'
+        : 'この難易度は2年ぶん全部に手が付いています。';
       return;
     }
     month = monthOf(date);
