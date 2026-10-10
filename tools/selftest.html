@@ -301,9 +301,67 @@
         await settle(2);
         click([...arc.querySelectorAll('.archive-levels .chip')].find((b) => b.textContent.startsWith('ふつう')));
         await settle(1);
-        click(arc.querySelector('.archive-foot .btn'));
+        click(arc.querySelector('.archive-find'));
         await settle(10);
         check('未着手の日へ飛べる', location.hash === `#${akari.todayString()}/normal`, location.hash);
+
+        // 20. 「未クリアだけ」の絞り込み（本家の ?unsolved=1 に当たる操作）
+        location.hash = `#${DATE}/${LEVEL}`;
+        await settle(8);
+        click($('archive-open'));
+        await settle(2);
+        const unsolvedBtn = arc.querySelector('.archive-unsolved');
+        check('「未クリアだけ」の切り替えがある', !!unsolvedBtn, unsolvedBtn ? unsolvedBtn.textContent : 'なし');
+        check('はじめは絞り込んでいない', unsolvedBtn.getAttribute('aria-pressed') === 'false');
+        check('絞り込む前はクリア済みの印が出ている', dayCell(DATE).classList.contains('done'), dayCell(DATE).className);
+
+        click(unsolvedBtn);
+        await settle(1);
+        check('押すと絞り込みが入る', unsolvedBtn.classList.contains('on') && unsolvedBtn.getAttribute('aria-pressed') === 'true');
+        check('クリア済みの日が伏せられる', dayCell(DATE).classList.contains('filtered'), dayCell(DATE).className);
+        check('伏せた日は押せない', dayCell(DATE).disabled);
+        check('伏せた日の印も消える', dayCell(DATE).querySelector('.archive-mark').textContent === '');
+        check('伏せてもマスの数は変わらない（曜日がずれない）', arc.querySelectorAll('.archive-day[data-date]').length === 30);
+        check('未クリアの日はそのまま押せる', !dayCell('2026-09-02').classList.contains('filtered') && !dayCell('2026-09-02').disabled);
+        check(
+          '集計が未クリアの数に変わる',
+          /未クリア \d+日（クリア \d+日は伏せています）/.test(arc.querySelector('.archive-sum').textContent),
+          arc.querySelector('.archive-sum').textContent,
+        );
+        check('行き先のボタンの名前も変わる', arc.querySelector('.archive-find').textContent === '未クリアの日へ');
+        check('絞り込みが保存される', localStorage.getItem('akari:v1:archive:unsolved-only') === '1');
+
+        // 絞り込み中の行き先は「クリアしていない日」。今日=クリア済み・昨日=途中、を
+        // 作ってから押すと、クリアした今日だけを飛ばして昨日へ戻るはず。
+        const back = (n) => {
+          const t = new Date();
+          t.setDate(t.getDate() - n);
+          return akari.todayString(t);
+        };
+        const blankBoard = '0'.repeat(49); // easy は 7×7
+        localStorage.setItem(`akari:v1:${back(0)}:easy`, JSON.stringify({ s: blankBoard, ms: 60000, done: true }));
+        localStorage.setItem(`akari:v1:${back(1)}:easy`, JSON.stringify({ s: blankBoard, ms: 5000 }));
+        click(arc.querySelector('.archive-find'));
+        await settle(10);
+        check('絞り込み中は途中でやめた日へ戻る', location.hash === `#${back(1)}/easy`, location.hash);
+
+        // 開き直しても絞り込みが続いている（押し直さなくてよい）。もう一度押すと戻る。
+        location.hash = `#${DATE}/${LEVEL}`;
+        await settle(8);
+        click($('archive-open'));
+        await settle(2);
+        check('開き直しても絞り込みが続いている', arc.querySelector('.archive-unsolved').classList.contains('on'));
+        check('開き直してもクリア済みは伏せたまま', dayCell(DATE).classList.contains('filtered'), dayCell(DATE).className);
+        click(arc.querySelector('.archive-unsolved'));
+        await settle(1);
+        check('戻すとクリア済みの印が出る', dayCell(DATE).classList.contains('done'), dayCell(DATE).className);
+        check('戻したことも保存される', localStorage.getItem('akari:v1:archive:unsolved-only') === '0');
+
+        // 絞り込みを外すと行き先は今までどおり「手つかずの日」（途中の昨日は飛ばす）
+        click(arc.querySelector('.archive-find'));
+        await settle(10);
+        check('絞り込みを外すと手つかずの日まで遡る', location.hash === `#${back(2)}/easy`, location.hash);
+
         check('最後まで、隠すはずの部品が見えていない', allHiddenAreHidden().length === 0, allHiddenAreHidden().join(' '));
 
         finish(null);

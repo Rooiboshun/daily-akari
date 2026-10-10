@@ -485,6 +485,19 @@ main {
   white-space: nowrap;
 }
 
+/* 「未クリアだけ」の絞り込み（archive.js が組み立てる）。 */
+.archive-filter {
+  display: flex;
+  gap: 6px;
+}
+
+.archive-filter .chip {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .archive-week,
 .archive-grid {
   display: grid;
@@ -542,6 +555,14 @@ main {
 
 .archive-day.revealed {
   color: var(--dim);
+}
+
+/* 絞り込みで伏せたクリア済みの日。列をずらさないために枠だけ残す
+   （`display: none` にすると曜日の並びが崩れてカレンダーとして読めない）。 */
+.archive-day.filtered {
+  background: none;
+  border-color: #23252b;
+  opacity: 0.25;
 }
 
 .archive-mark {
